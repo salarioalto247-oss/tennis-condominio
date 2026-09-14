@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prenotazione Campi da Tennis</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f9f9f9; color: #333; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; background: #fff; border-bottom: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    h1 { font-size: 1.4em; margin: 0; }
+    
+    /* Stili Modale Login */
+    #login-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: white; padding: 30px; border-radius: 8px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center; }
+    .modal-content input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .modal-content button { width: 100%; padding: 10px; background: #0070f3; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+    
+    /* Pannello Gestionale Admin nascosto di default */
+    #admin-gestion-panel { display: none; margin: 20px auto; padding: 20px; background: #fff; border: 1px solid #ccc; border-radius: 8px; max-width: 960px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .container { padding: 20px; max-width: 1000px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+
+  <!-- Header con info utente in alto a destra -->
+  <header>
+    <h1>🎾 Prenotazione Campi Tennis</h1>
+    <div id="user-info-container" style="display: flex; align-items: center; gap: 12px;">
+      <span id="logged-user-display" style="font-weight: bold; font-size: 1em; color: #0070f3;"></span>
+      
+      <!-- Pulsante Gestionale Admin (visibile solo se isAdmin = true) -->
+      <button id="admin-panel-btn" onclick="toggleAdminPanel()" style="display: none; padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+        ⚙️ Gestionale Admin
+      </button>
+      
+      <button id="logout-btn" onclick="logoutUser()" style="display: none; padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        Cambia Utente
+      </button>
+    </div>
+  </header>
+
+  <!-- Modale Pop-Up Login in Apertura con Autocompletamento -->
+  <div id="login-modal" style="display: none;">
+    <div class="modal-content" style="position: relative;">
+      <h2>Accesso Utente</h2>
+      <p style="font-size: 0.85em; color: #666; margin-bottom: 20px;">Inizia a digitare il tuo cognome e inserisci il PIN</p>
+      
+      <!-- Input con tendina suggerimenti autocompletamento -->
+      <div style="position: relative; margin-bottom: 15px; text-align: left;">
+        <input type="text" id="login-cognome" placeholder="Cognome (es. Rossi o Admin)" autocomplete="off" oninput="filtraSuggerimenti(this.value)" />
+        <ul id="suggerimenti-list" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; list-style: none; margin: -15px 0 0 0; padding: 0; max-height: 140px; overflow-y: auto; display: none; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></ul>
+      </div>
+
+      <input type="password" id="login-pin" placeholder="PIN" />
+      
+      <button onclick="handleLogin()">Accedi</button>
+      <p id="login-error" style="color: red; font-size: 0.8em; margin-top: 10px;"></p>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Sezione Pannello Gestionale Admin -->
+    <div id="admin-gestion-panel">
+      <h3>Pannello di Amministrazione Utenti</h3>
+      <p>Elenco degli utenti registrati nel sistema:</p>
+      <div id="admin-users-list"></div>
+      <button onclick="toggleAdminPanel()" style="margin-top: 15px; background: #666; color: white; border:none; padding: 6px 12px; border-radius:4px; cursor:pointer;">Chiudi Pannello</button>
+    </div>
+
+    <!-- Tabellone prenotazioni -->
+    <h2>Tabellone Orari</h2>
+    <p>Benvenuto, <span id="current-user-span" style="font-weight:bold;"></span>. Clicca sugli slot del tabellone per prenotare o cancellare le ore direttamente.</p>
+    <div id="tabellone-container">
+      <!-- Inserisci qui il tuo tabellone o calendario prenotazioni -->
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null; 
+    let listaUtentiCache = [];
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await scaricaListaUtentiPerAutocheck();
+
+      const savedUser = localStorage.getItem('tennis_user');
+      const savedPin = localStorage.getItem('tennis_pin');
+
+      if (savedUser && savedPin) {
+        validaEImpostaSessione(savedUser, savedPin);
+      } else {
+        mostraModaleLogin();
+      }
+    });
+
+    async function scaricaListaUtentiPerAutocheck() {
+      try {
+        const response = await fetch('/api/admin', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (response.ok && Array.isArray(data)) {
+          listaUtentiCache = data;
+        }
+      } catch (err) {
+        console.error('Errore caricamento cache utenti:', err);
+      }
+    }
+
+    function filtraSuggerimenti(testoDigitato) {
+      const listaEl = document.getElementById('suggerimenti-list');
+      listaEl.innerHTML = '';
+      
+      if (!testoDigitato || testoDigitato.trim() === '') {
+        listaEl.style.display = 'none';
+        return;
+      }
+
+      const query = testoDigitato.toLowerCase();
+      const filtrati = listaUtentiCache.filter(u => u.cognome.toLowerCase().startsWith(query));
+
+      if (filtrati.length > 0) {
+        listaEl.style.display = 'block';
+        filtrati.forEach(u => {
+          const li = document.createElement('li');
+          li.textContent = u.cognome;
+          li.style.padding = '8px 12px';
+          li.style.cursor = 'pointer';
+          li.style.borderBottom = '1px solid #eee';
+          
+          li.onmouseover = () => li.style.background = '#f0f0f0';
+          li.onmouseout = () => li.style.background = 'white';
+          
+          li.onclick = () => {
+            document.getElementById('login-cognome').value = u.cognome;
+            listaEl.style.display = 'none';
+            document.getElementById('login-pin').focus();
+          };
+          
+          listaEl.appendChild(li);
+        });
+      } else {
+        listaEl.style.display = 'none';
+      }
+    }
+
+    function mostraModaleLogin() {
+      document.getElementById('login-modal').style.display = 'flex';
+    }
+
+    function nascondiModaleLogin() {
+      document.getElementById('login-modal').style.display = 'none';
+      document.getElementById('suggerimenti-list').style.display = 'none';
+    }
+
+    async function handleLogin() {
+      const cognomeInput = document.getElementById('login-cognome').value.trim();
+      const pinInput = document.getElementById('login-pin').value.trim();
+      const errorEl = document.getElementById('login-error');
+
+      if (!cognomeInput || !pinInput) {
+        errorEl.textContent = 'Compila tutti i campi';
+        return;
+      }
+
+      await validaEImpostaSessione(cognomeInput, pinInput, true);
+    }
+
+    async function validaEImpostaSessione(cognome, pin, mostraErroriUI = false) {
+      const errorEl = document.getElementById('login-error');
+      try {
+        const response = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminPin: pin, action: 'get-users' })
+        });
+        const data = await response.json();
+
+        if (response.ok && Array.isArray(data)) {
+          const userFound = data.find(u => u.cognome.toLowerCase() === cognome.toLowerCase() && u.pin === pin);
+          const isMaster = (cognome.toLowerCase() === 'admin' && pin === '0000');
+
+          if (userFound || isMaster) {
+            currentUser = userFound || { cognome: 'Admin', pin: '0000', isAdmin: true };
+            
+            localStorage.setItem('tennis_user', currentUser.cognome);
+            localStorage.setItem('tennis_pin', currentUser.pin);
+
+            nascondiModaleLogin();
+            aggiornaInterfacciaUtente();
+            caricaTabellone();
+            return;
+          }
+        }
+        
+        if (mostraErroriUI) {
+          errorEl.textContent = 'Cognome o PIN errati';
+        } else {
+          logoutUser();
+        }
+      } catch (err) {
+        console.error('Errore connessione:', err);
+        if (mostraErroriUI) errorEl.textContent = 'Errore di connessione al server';
+        else logoutUser();
+      }
+    }
+
+    function aggiornaInterfacciaUtente() {
+      if (!currentUser) return;
+      document.getElementById('logged-user-display').textContent = `Utente: ${currentUser.cognome} ${currentUser.isAdmin ? '(Admin)' : ''}`;
+      document.getElementById('current-user-span').textContent = currentUser.cognome;
+      document.getElementById('logout-btn').style.display = 'inline-block';
+      
+      const adminBtn = document.getElementById('admin-panel-btn');
+      if (currentUser.isAdmin) {
+        adminBtn.style.display = 'inline-block';
+      } else {
+        adminBtn.style.display = 'none';
+      }
+    }
+
+    function logoutUser() {
+      localStorage.removeItem('tennis_user');
+      localStorage.removeItem('tennis_pin');
+      currentUser = null;
+      document.getElementById('admin-gestion-panel').style.display = 'none';
+      mostraModaleLogin();
+    }
+
+    function toggleAdminPanel() {
+      if (!currentUser || !currentUser.isAdmin) return;
+      const panel = document.getElementById('admin-gestion-panel');
+      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+      if (panel.style.display === 'block') {
+        caricaListaUtentiAdmin();
+      }
+    }
+
+    async function caricaListaUtentiAdmin() {
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminPin: currentUser.pin, action: 'get-users' })
+        });
+        const users = await res.json();
+        if (res.ok && Array.isArray(users)) {
+          let html = '<ul style="padding-left: 20px;">';
+          users.forEach(u => {
+            html += `<li style="margin-bottom: 5px;"><b>${u.cognome}</b> - PIN: ${u.pin} ${u.isAdmin ? '<span style="color:green; font-weight:bold;">(Admin)</span>' : ''}</li>`;
+          });
+          html += '</ul>';
+          document.getElementById('admin-users-list').innerHTML = html;
+        }
+      } catch (e) {
+        console.error('Errore caricamento lista utenti admin', e);
+      }
+    }
+
+    function caricaTabellone() {
+      console.log("Tabellone pronto per l'utente loggato:", currentUser.cognome);
+    }
+  </script>
+</body>
+</html>
