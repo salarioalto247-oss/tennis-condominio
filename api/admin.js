@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // GESTIONE GET: Legge la lista degli utenti
+    // GET: Legge la lista degli utenti
     if (req.method === 'GET') {
       const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*&order=cognome.asc`, {
         headers: {
@@ -29,18 +29,28 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    // GESTIONE POST: Aggiorna i dati dell'utente
+    // POST: Gestisce sia il caricamento utenti richiesto dal frontend sia le modifiche/aggiunte
     if (req.method === 'POST') {
       const body = req.body || {};
-      const { cognome, pin, is_admin } = body;
+      const { action, cognome, pin, newPin, is_admin } = body;
 
-      if (!cognome) {
-        // Se manca il cognome, restituiamo un JSON pulito invece di bloccare la richiesta con errore 400 secca
-        return res.status(200).json({ success: false, error: 'Cognome mancante nella richiesta' });
+      // Se il frontend chiede la lista utenti (es. in fase di login o pannello admin)
+      if (action === 'get-users' || !cognome) {
+        const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*&order=cognome.asc`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(JSON.stringify(data));
+        return res.status(200).json(data);
       }
 
+      // Altrimenti gestisce l'aggiornamento del PIN o dei dati utente
       const updatePayload = {};
       if (pin !== undefined) updatePayload.pin = pin;
+      if (newPin !== undefined) updatePayload.pin = newPin;
       if (is_admin !== undefined) updatePayload.is_admin = is_admin;
 
       const response = await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(cognome)}`, {
@@ -57,7 +67,7 @@ export default async function handler(req, res) {
       const data = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(data));
 
-      return res.status(200).json({ success: true, data });
+      return res.status(200).json({ success: true, data, message: 'Operazione completata con successo' });
     }
 
     return res.status(405).json({ error: 'Metodo non consentito' });
