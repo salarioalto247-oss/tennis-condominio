@@ -97,6 +97,17 @@
     .btn-yellow:hover {
       background-color: #b7791f !important;
     }
+    .btn-blue {
+      background-color: #3182ce !important;
+      color: white;
+      border: none;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-blue:hover {
+      background-color: #2b6cb0 !important;
+    }
   </style>
 </head>
 <body>
@@ -376,14 +387,23 @@
           html += '<tr style="background: #f4f4f4; text-align: left;"><th style="padding: 6px; border: 1px solid #ddd;">Cognome</th><th style="padding: 6px; border: 1px solid #ddd;">PIN</th><th style="padding: 6px; border: 1px solid #ddd; text-align: center;">Azioni</th></tr>';
           
           users.forEach(u => {
+            const isMasterAdmin = u.cognome.toLowerCase() === 'admin';
             html += `
               <tr>
-                <td style="padding: 6px; border: 1px solid #ddd;"><b>${u.cognome}</b> ${u.isAdmin ? '<span style="color:green;">(Admin)</span>' : ''}</td>
-                <td style="padding: 6px; border: 1px solid #ddd;">${u.pin}</td>
+                <td style="padding: 6px; border: 1px solid #ddd;">
+                  <b>${u.cognome}</b> ${u.isAdmin ? '<span style="color:green;">(Admin)</span>' : ''}
+                  ${!isMasterAdmin ? `<div style="margin-top: 4px;"><button class="btn-blue" onclick="modificaCognomeAdmin('${u.cognome}')" style="font-size: 10px; padding: 3px 6px;">Modifica Nome</button></div>` : ''}
+                </td>
+                <td style="padding: 6px; border: 1px solid #ddd;">
+                  ${u.pin}
+                  ${!isMasterAdmin ? `
+                  <div style="margin-top: 4px; white-space: nowrap;">
+                    <button class="btn-blue" onclick="modificaPinAdmin('${u.cognome}', '${u.pin}')" style="font-size: 10px; padding: 3px 6px; margin-right: 3px;">Modifica PIN</button>
+                    <button class="btn-yellow" onclick="resettaPinAdmin('${u.cognome}')" style="font-size: 10px; padding: 3px 6px;">Reset (Random)</button>
+                  </div>` : ''}
+                </td>
                 <td style="padding: 6px; border: 1px solid #ddd; text-align: center; white-space: nowrap;">
-                  <button class="btn-yellow" onclick="resettaPinAdmin('${u.cognome}')" style="font-size: 11px; margin-right: 3px;">Reset (Random)</button>
-                  <button class="admin-btn" onclick="modificaPinAdmin('${u.cognome}', '${u.pin}')" style="font-size: 11px; margin-right: 3px; background-color: #3182ce; padding: 6px 10px;">Modifica</button>
-                  ${u.cognome.toLowerCase() !== 'admin' ? `<button class="btn-red" onclick="eliminaUtenteAdmin('${u.cognome}')" style="font-size: 11px;">Elimina</button>` : ''}
+                  ${!isMasterAdmin ? `<button class="btn-red" onclick="eliminaUtenteAdmin('${u.cognome}')" style="font-size: 11px; padding: 5px 10px;">Elimina</button>` : '<span style="color: #888; font-size: 11px;">Protetto</span>'}
                 </td>
               </tr>
             `;
@@ -438,7 +458,40 @@
       }
     }
 
-    // 1) RESET: Genera direttamente un PIN randomico e lo salva
+    async function modificaCognomeAdmin(vecchioCognome) {
+      const nuovoCognome = prompt(`Correggi il cognome per l'utente: ${vecchioCognome}\n\nInserisci il nuovo cognome corretto:`, vecchioCognome);
+      if (nuovoCognome === null) return;
+      const cognomeFinale = nuovoCognome.trim();
+      if (!cognomeFinale) {
+        alert("Il cognome non può essere vuoto.");
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminPin: currentUser.pin,
+            action: 'update-cognome',
+            vecchioCognome: vecchioCognome,
+            nuovoCognome: cognomeFinale
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`Cognome aggiornato con successo a: ${cognomeFinale}`);
+          caricaListaUtentiAdmin();
+          scaricaListaUtentiPerAutocheck();
+        } else {
+          alert(data.error || 'Errore durante la modifica del cognome.');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Errore di connessione al server.');
+      }
+    }
+
     async function resettaPinAdmin(cognome) {
       if (!confirm(`Sei sicuro di voler generare un nuovo PIN randomico per ${cognome}?`)) return;
 
@@ -465,12 +518,9 @@
       }
     }
 
-    // 2) MODIFICA: Permette all'Admin di inserire manualmente un PIN a scelta
     async function modificaPinAdmin(cognome, pinAttuale) {
       const nuovoPin = prompt(`Modifica PIN per l'utente: ${cognome}\n\nInserisci il nuovo PIN desiderato:`, pinAttuale);
-      
       if (nuovoPin === null) return;
-      
       const pinFinale = nuovoPin.trim();
       if (!pinFinale) {
         alert("Il PIN non può essere vuoto.");
@@ -603,19 +653,21 @@
               const testoNomi = utentiSlot.join(' & ');
               const pieno = utentiSlot.length >= 2;
 
-              let bgStyle = eMio ? '#e3f2fd' : '#ffebee';
-              if (pieno) bgStyle = '#fff8e1';
-              if (currentUser.isAdmin) bgStyle = '#e2e8f0';
+              // INVERSIONE COLORI SLOT OCCUPATI/PRENOTATI (Sfondo colorato, testo bianco)
+              let bgStyle = eMio ? '#1976d2' : '#d32f2f'; // Blu se mio, Rosso se di altri
+              if (pieno) bgStyle = '#f57f17'; // Arancione scuro se doppio pieno
+              if (currentUser.isAdmin) bgStyle = '#475569'; // Grigio scuro per admin
 
               html += `
                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center; background: ${bgStyle}; cursor: pointer;" onclick="gestisciSlot('${g.iso}', '${ora}')">
-                  <span style="color: ${eMio ? '#1565c0' : '#c62828'}; font-weight: bold; font-size: 12px;">${testoNomi} ${pieno ? '(Doppio)' : ''}</span>
+                  <span style="color: #ffffff; font-weight: bold; font-size: 12px;">${testoNomi} ${pieno ? '(Doppio)' : ''}</span>
                 </td>
               `;
             } else {
+              // INVERSIONE COLORI SLOT LIBERI (Sfondo verde pieno, testo bianco)
               html += `
-                <td style="padding: 10px; border: 1px solid #ddd; cursor: pointer; text-align: center;" onclick="gestisciSlot('${g.iso}', '${ora}')">
-                  <span style="color: green; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Disponibile</span>
+                <td style="padding: 10px; border: 1px solid #ddd; cursor: pointer; text-align: center; background: #2e7d32;" onclick="gestisciSlot('${g.iso}', '${ora}')">
+                  <span style="color: #ffffff; font-weight: bold; font-size: 12px;">Disponibile</span>
                 </td>
               `;
             }
