@@ -526,7 +526,7 @@
           </div>
 
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h3>Tabellone Orari - Campo Via Suvereto 247</h3>
+            <h3>Tabellone Orari - Campo da Tennis Via Suvereto 247</h3>
             <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b> ${currentUser.isAdmin ? '<span style="color: #2b6cb0; font-weight: bold;">[Modalità Admin: Gestione Totale]</span>' : ''}. Orario continuato dalle 08:00 alle 21:00.</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <thead>
@@ -567,6 +567,7 @@
 
               let bgStyle = eMio ? '#e3f2fd' : '#ffebee';
               if (pieno) bgStyle = '#fff8e1';
+              if (currentUser.isAdmin) bgStyle = '#e2e8f0';
 
               html += `
                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center; background: ${bgStyle}; cursor: pointer;" onclick="gestisciSlot('${g.iso}', '${ora}')">
