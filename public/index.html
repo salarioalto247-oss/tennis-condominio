@@ -136,7 +136,7 @@
   <script>
     let currentUser = null; 
     let listaUtentiCache = [];
-    let prenotazioniGlobali = {}; // Struttura: { "2026-09-16_08:00": ["Rossi", "Bianchi"] }
+    let prenotazioniGlobali = {}; // Struttura condivisa: { "2026-09-16_08:00": ["Rossi", "Bianchi"] }
 
     window.addEventListener('DOMContentLoaded', async () => {
       await scaricaListaUtentiPerAutocheck();
@@ -163,6 +163,36 @@
         }
       } catch (err) {
         console.error('Errore caricamento cache utenti:', err);
+      }
+    }
+
+    // Funzione per sincronizzare e prelevare le prenotazioni dal server/calendar condiviso
+    async function sincronizzaPrenotazioni() {
+      try {
+        const response = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminPin: currentUser.pin, action: 'get-bookings' })
+        });
+        const data = await response.json();
+        if (response.ok && data && typeof data === 'object') {
+          prenotazioniGlobali = data;
+        }
+      } catch (err) {
+        console.error('Errore sincronizzazione prenotazioni:', err);
+      }
+    }
+
+    // Funzione per salvare le prenotazioni sul server condiviso
+    async function salvaPrenotazioniServer() {
+      try {
+        await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminPin: currentUser.pin, action: 'save-bookings', bookings: prenotazioniGlobali })
+        });
+      } catch (err) {
+        console.error('Errore salvataggio prenotazioni:', err);
       }
     }
 
@@ -251,7 +281,7 @@
 
             nascondiModaleLogin();
             aggiornaInterfacciaUtente();
-            caricaTabellone();
+            await caricaTabellone();
             return;
           }
         }
@@ -329,6 +359,9 @@
     }
 
     async function caricaTabellone() {
+      // Sincronizza lo stato globale prima di disegnare la griglia
+      await sincronizzaPrenotazioni();
+
       const container = document.getElementById('tabellone-container') || document.querySelector('.container');
       if (!container) return;
       
@@ -363,7 +396,7 @@
           </div>
 
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h3>Tabellone Orari - Campo Unico (Supporta Singolo e Doppio)</h3>
+            <h3>Tabellone Orari - Campo Unico (Condiviso)</h3>
             <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Orario continuato dalle 08:00 alle 21:00 (Max 2 slot al giorno per utente, max 2 giocatori per slot).</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <thead>
@@ -395,7 +428,7 @@
 
           giorniArray.forEach(g => {
             const chiaveSlot = `${g.iso}_${ora}`;
-            const utentiSlot = prenotazioniGlobali[chiaveSlot] || []; // Array di stringhe (es. ["Rossi", "Bianchi"])
+            const utentiSlot = prenotazioniGlobali[chiaveSlot] || [];
 
             if (utentiSlot.length > 0) {
               const eMio = utentiSlot.some(u => u.toLowerCase() === currentUser.cognome.toLowerCase());
@@ -403,7 +436,7 @@
               const pieno = utentiSlot.length >= 2;
 
               let bgStyle = eMio ? '#e3f2fd' : '#ffebee';
-              if (pieno) bgStyle = '#fff8e1'; // Giallino se pieno (2 giocatori)
+              if (pieno) bgStyle = '#fff8e1';
 
               html += `
                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center; background: ${bgStyle}; cursor: pointer;" onclick="gestisciSlot('${g.iso}', '${ora}')">
@@ -436,7 +469,10 @@
       }
     }
 
-    function gestisciSlot(dataIso, ora) {
+    async function gestisciSlot(dataIso, ora) {
+      // Sincronizza prima di effettuare modifiche per evitare conflitti
+      await sincronizzaPrenotazioni();
+
       const chiaveSlot = `${dataIso}_${ora}`;
       if (!prenotazioniGlobali[chiaveSlot]) {
         prenotazioniGlobali[chiaveSlot] = [];
@@ -456,29 +492,29 @@
       const giaPresente = utentiSlot.some(u => u.toLowerCase() === currentUser.cognome.toLowerCase());
 
       if (giaPresente) {
-        // L'utente è già in questo slot -> Vuole rimuovere la propria prenotazione
         if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
           prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
           if (prenotazioniGlobali[chiaveSlot].length === 0) {
             delete prenotazioniGlobali[chiaveSlot];
           }
-          caricaTabellone();
+          await salvaPrenotazioniServer();
+          await caricaTabellone();
         }
       } else if (currentUser.isAdmin) {
-        // L'admin può forzare inserimenti o cancellazioni
         if (utentiSlot.length >= 2) {
           if (confirm(`[ADMIN] Lo slot è pieno (2 giocatori). Vuoi liberarlo completamente?`)) {
             delete prenotazioniGlobali[chiaveSlot];
-            caricaTabellone();
+            await salvaPrenotazioniServer();
+            await caricaTabellone();
           }
         } else {
           if (confirm(`[ADMIN] Vuoi aggiungere ${currentUser.cognome} a questo slot?`)) {
             utentiSlot.push(currentUser.cognome);
-            caricaTabellone();
+            await salvaPrenotazioniServer();
+            await caricaTabellone();
           }
         }
       } else {
-        // Utente normale che vuole aggiungersi
         if (utentiSlot.length >= 2) {
           alert("Questo slot ha già raggiunto il numero massimo di 2 giocatori (doppio completato).");
           return;
@@ -500,14 +536,14 @@
           return;
         }
 
-        // Procedi con l'aggiunta (es. secondo giocatore per il doppio)
         const msg = utentiSlot.length === 1 
           ? `C'è già ${utentiSlot[0]} in questo slot. Vuoi unirti per fare il doppio il giorno ${dataIso} alle ore ${ora}?`
           : `Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`;
 
         if (confirm(msg)) {
           utentiSlot.push(currentUser.cognome);
-          caricaTabellone();
+          await salvaPrenotazioniServer();
+          await caricaTabellone();
         }
       }
     }
