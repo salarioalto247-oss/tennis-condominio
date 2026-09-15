@@ -136,6 +136,7 @@
   <script>
     let currentUser = null; 
     let listaUtentiCache = [];
+    let prenotazioniGlobali = {}; // Struttura: { "2026-09-16_08:00": "Rossi" }
 
     window.addEventListener('DOMContentLoaded', async () => {
       await scaricaListaUtentiPerAutocheck();
@@ -328,8 +329,6 @@
     }
 
     async function caricaTabellone() {
-      console.log("Tabellone pronto per l'utente loggato:", currentUser.cognome);
-      
       const container = document.getElementById('tabellone-container') || document.querySelector('.container');
       if (!container) return;
       
@@ -342,7 +341,6 @@
       }
 
       try {
-        // Calcoliamo la data di oggi e i 2 giorni successivi
         const oggi = new Date();
         const giorniArray = [];
         
@@ -366,7 +364,7 @@
 
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <h3>Tabellone Orari - Campo Unico</h3>
-            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Orario continuato dalle 08:00 alle 21:00. Clicca su uno slot per prenotare.</p>
+            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Orario continuato dalle 08:00 alle 21:00 (Max 2 slot al giorno per utente).</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <thead>
                 <tr style="background: #f4f4f4; text-align: left;">
@@ -383,7 +381,6 @@
               <tbody>
         `;
 
-        // Generazione automatica degli slot orari dalle 08:00 alle 21:00
         const ore = [];
         for (let h = 8; h <= 21; h++) {
           const oraStringa = h < 10 ? `0${h}:00` : `${h}:00`;
@@ -397,11 +394,23 @@
           `;
 
           giorniArray.forEach(g => {
-            html += `
-              <td style="padding: 10px; border: 1px solid #ddd; cursor: pointer; text-align: center;" onclick="prenotaSlot('${g.iso}', '${ora}')">
-                <span style="color: green; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Disponibile</span>
-              </td>
-            `;
+            const chiaveSlot = `${g.iso}_${ora}`;
+            const occupatoDa = prenotazioniGlobali[chiaveSlot];
+
+            if (occupatoDa) {
+              const eMio = (occupatoDa.toLowerCase() === currentUser.cognome.toLowerCase());
+              html += `
+                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; background: ${eMio ? '#e3f2fd' : '#ffebee'}; cursor: pointer;" onclick="gestisciSlot('${g.iso}', '${ora}')">
+                  <span style="color: ${eMio ? '#1565c0' : '#c62828'}; font-weight: bold; font-size: 12px;">${occupatoDa}</span>
+                </td>
+              `;
+            } else {
+              html += `
+                <td style="padding: 10px; border: 1px solid #ddd; cursor: pointer; text-align: center;" onclick="gestisciSlot('${g.iso}', '${ora}')">
+                  <span style="color: green; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Disponibile</span>
+                </td>
+              `;
+            }
           });
 
           html += `</tr>`;
@@ -421,8 +430,63 @@
       }
     }
 
-    function prenotaSlot(dataIso, ora) {
-      alert(`Utente ${currentUser.cognome}: richiesta prenotazione per il giorno ${dataIso} alle ore ${ora}`);
+    function gestisciSlot(dataIso, ora) {
+      const chiaveSlot = `${dataIso}_${ora}`;
+      const occupatoDa = prenotazioniGlobali[chiaveSlot];
+
+      if (occupatoDa) {
+        // Slot occupato: solo chi lo ha prenotato o l'Admin possono rilasciarlo
+        const isMio = (occupatoDa.toLowerCase() === currentUser.cognome.toLowerCase());
+        if (isMio || currentUser.isAdmin) {
+          const msg = currentUser.isAdmin && !isMio 
+            ? `[ADMIN] Vuoi rilasciare lo slot di ${occupatoDa} per il giorno ${dataIso} alle ore ${ora}?`
+            : `Vuoi cancellare la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`;
+            
+          if (confirm(msg)) {
+            delete prenotazioniGlobali[chiaveSlot];
+            caricaTabellone();
+          }
+        } else {
+          alert(`Questo slot è già impegnato da ${occupatoDa}. Non puoi modificarlo.`);
+        }
+      } else {
+        // Slot libero: verifichiamo che l'utente non abbia già 2 slot prenotati in quella giornata
+        if (!currentUser.isAdmin) {
+          let slotPrenotatiOggi = 0;
+          for (let chiave in prenotazioniGlobali) {
+            // chiave formata da "YYYY-MM-DD_HH:00"
+            if (chiave.startsWith(dataIso) && prenotazioniGlobali[chiave].toLowerCase() === currentUser.cognome.toLowerCase()) {
+              slotPrenotatiOggi++;
+            }
+          }
+
+          if (slotPrenotatiOggi >= 2) {
+            alert(`Hai già raggiunto il limite massimo di 2 slot prenotati per il giorno ${dataIso}.`);
+            return;
+          }
+        }
+
+        // Se il limite non è superato, procedi con la prenotazione
+        if (confirm(`Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`)) {
+          prenotazioniGlobali[chiaveSlot] = currentUser.cognome;
+          caricaTabellone();
+          
+          if (confirm("Vuoi aggiungere questo evento al tuo calendario personale?")) {
+            const titolo = encodeURIComponent("Partita Tennis - Condominio");
+            const dettagli = encodeURIComponent("Prenotazione campo da tennis unico.");
+            const [anno, mese, giorno] = dataIso.split('-');
+            const [oraInizio] = ora.split(':');
+            
+            const dataInizioStr = `${anno}${mese}${giorno}T${oraInizio}0000`;
+            const oraFineNum = parseInt(oraInizio) + 1;
+            const oraFineStr = (oraFineNum < 10 ? '0' : '') + oraFineNum + '0000';
+            const dataFineStr = `${anno}${mese}${giorno}T${oraFineStr}`;
+
+            const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titolo}&dates=${dataInizioStr}/${dataFineStr}&details=${dettagli}`;
+            window.open(googleCalendarUrl, '_blank');
+          }
+        }
+      }
     }
   </script>
 </body>
