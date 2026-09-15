@@ -358,9 +358,15 @@
         }
 
         let html = `
+          <!-- Didascalia informativa come da PDF -->
+          <div style="background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 12px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; line-height: 1.4; text-transform: uppercase;">
+            N.B. SI PUO' PRENOTARE AL MASSIMO FINO A DUE GIORNI SUCCESSIVI<br>
+            LE PRENOTAZIONI EFFETTUATE IN ANTICIPO SARANNO CANCELLATE
+          </div>
+
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <h3>Tabellone Orari - Campo Unico</h3>
-            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Orario continuato dalle 08:00 alle 21:00 (oggi e i successivi 2 giorni). Clicca su uno slot per prenotare.</p>
+            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Orario continuato dalle 08:00 alle 21:00. Clicca su uno slot per prenotare.</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <thead>
                 <tr style="background: #f4f4f4; text-align: left;">
