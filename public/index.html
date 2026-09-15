@@ -454,7 +454,6 @@
         if (!currentUser.isAdmin) {
           let slotPrenotatiOggi = 0;
           for (let chiave in prenotazioniGlobali) {
-            // chiave formata da "YYYY-MM-DD_HH:00"
             if (chiave.startsWith(dataIso) && prenotazioniGlobali[chiave].toLowerCase() === currentUser.cognome.toLowerCase()) {
               slotPrenotatiOggi++;
             }
@@ -466,25 +465,10 @@
           }
         }
 
-        // Se il limite non è superato, procedi con la prenotazione
+        // Se il limite non è superato, procedi con la prenotazione direttamente
         if (confirm(`Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`)) {
           prenotazioniGlobali[chiaveSlot] = currentUser.cognome;
           caricaTabellone();
-          
-          if (confirm("Vuoi aggiungere questo evento al tuo calendario personale?")) {
-            const titolo = encodeURIComponent("Partita Tennis - Condominio");
-            const dettagli = encodeURIComponent("Prenotazione campo da tennis unico.");
-            const [anno, mese, giorno] = dataIso.split('-');
-            const [oraInizio] = ora.split(':');
-            
-            const dataInizioStr = `${anno}${mese}${giorno}T${oraInizio}0000`;
-            const oraFineNum = parseInt(oraInizio) + 1;
-            const oraFineStr = (oraFineNum < 10 ? '0' : '') + oraFineNum + '0000';
-            const dataFineStr = `${anno}${mese}${giorno}T${oraFineStr}`;
-
-            const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titolo}&dates=${dataInizioStr}/${dataFineStr}&details=${dettagli}`;
-            window.open(googleCalendarUrl, '_blank');
-          }
         }
       }
     }
