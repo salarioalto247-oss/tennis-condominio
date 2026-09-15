@@ -11,11 +11,11 @@ export default async function handler(req, res) {
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    return res.status(500).json({ error: 'Variabili d ambiente Supabase non configurate correttamente su Vercel' });
+    return res.status(500).json({ error: 'Variabili d ambiente Supabase non configurate' });
   }
 
   try {
-    // GESTIONE GET: Legge la lista degli utenti ordinati per cognome
+    // GESTIONE GET: Legge la lista degli utenti
     if (req.method === 'GET') {
       const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*&order=cognome.asc`, {
         headers: {
@@ -29,12 +29,14 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    // GESTIONE POST: Aggiorna i dati dell'utente (es. PIN o permessi)
+    // GESTIONE POST: Aggiorna i dati dell'utente
     if (req.method === 'POST') {
-      const { cognome, pin, is_admin } = req.body;
+      const body = req.body || {};
+      const { cognome, pin, is_admin } = body;
 
       if (!cognome) {
-        return res.status(400).json({ error: 'Il campo cognome è obbligatorio' });
+        // Se manca il cognome, restituiamo un JSON pulito invece di bloccare la richiesta con errore 400 secca
+        return res.status(200).json({ success: false, error: 'Cognome mancante nella richiesta' });
       }
 
       const updatePayload = {};
