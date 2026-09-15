@@ -134,7 +134,7 @@
     <!-- Pannello Admin (Console di Amministrazione Completa) -->
     <div id="admin-gestion-panel" style="display: none; background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
       <h3 style="margin-top: 0; color: #2b6cb0;">⚙️ Console di Amministrazione</h3>
-      <p style="font-size: 13px; color: #666;">Gestisci gli utenti registrati, i PIN di accesso e monitora l'anagrafica del condominio[cite: 1].</p>
+      <p style="font-size: 13px; color: #666;">Gestisci gli utenti registrati, i PIN di accesso e monitora l'anagrafica del condominio.</p>
       
       <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
@@ -380,8 +380,9 @@
               <tr>
                 <td style="padding: 6px; border: 1px solid #ddd;"><b>${u.cognome}</b> ${u.isAdmin ? '<span style="color:green;">(Admin)</span>' : ''}</td>
                 <td style="padding: 6px; border: 1px solid #ddd;">${u.pin}</td>
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">
-                  <button class="btn-yellow" onclick="resettaPinAdmin('${u.cognome}')" style="font-size: 11px; margin-right: 5px;">Reset PIN</button>
+                <td style="padding: 6px; border: 1px solid #ddd; text-align: center; white-space: nowrap;">
+                  <button class="btn-yellow" onclick="resettaPinAdmin('${u.cognome}')" style="font-size: 11px; margin-right: 3px;">Reset (Random)</button>
+                  <button class="admin-btn" onclick="modificaPinAdmin('${u.cognome}', '${u.pin}')" style="font-size: 11px; margin-right: 3px; background-color: #3182ce; padding: 6px 10px;">Modifica</button>
                   ${u.cognome.toLowerCase() !== 'admin' ? `<button class="btn-red" onclick="eliminaUtenteAdmin('${u.cognome}')" style="font-size: 11px;">Elimina</button>` : ''}
                 </td>
               </tr>
@@ -437,13 +438,40 @@
       }
     }
 
+    // 1) RESET: Genera direttamente un PIN randomico e lo salva
     async function resettaPinAdmin(cognome) {
-      const pinCasuale = Math.floor(1000 + Math.random() * 9000).toString();
-      const nuovoPinInserito = prompt(`PIN casuale generato per ${cognome}:\n\nVuoi confermare questo PIN o digitarne uno nuovo?`, pinCasuale);
+      if (!confirm(`Sei sicuro di voler generare un nuovo PIN randomico per ${cognome}?`)) return;
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminPin: currentUser.pin,
+            action: 'reset-pin',
+            cognome: cognome
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`PIN resettato con successo per ${cognome}!`);
+          caricaListaUtentiAdmin();
+        } else {
+          alert(data.error || 'Errore durante il reset del PIN.');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Errore di connessione al server.');
+      }
+    }
+
+    // 2) MODIFICA: Permette all'Admin di inserire manualmente un PIN a scelta
+    async function modificaPinAdmin(cognome, pinAttuale) {
+      const nuovoPin = prompt(`Modifica PIN per l'utente: ${cognome}\n\nInserisci il nuovo PIN desiderato:`, pinAttuale);
       
-      if (nuovoPinInserito === null) return;
+      if (nuovoPin === null) return;
       
-      const pinFinale = nuovoPinInserito.trim();
+      const pinFinale = nuovoPin.trim();
       if (!pinFinale) {
         alert("Il PIN non può essere vuoto.");
         return;
@@ -462,10 +490,10 @@
         });
         const data = await res.json();
         if (res.ok) {
-          alert(`PIN aggiornato con successo per ${cognome} (PIN: ${pinFinale})`);
+          alert(`PIN modificato con successo per ${cognome} (Nuovo PIN: ${pinFinale})`);
           caricaListaUtentiAdmin();
         } else {
-          alert(data.error || 'Errore durante il reset del PIN.');
+          alert(data.error || 'Errore durante la modifica del PIN.');
         }
       } catch (e) {
         console.error(e);
