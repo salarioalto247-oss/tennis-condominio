@@ -438,7 +438,16 @@
     }
 
     async function resettaPinAdmin(cognome) {
-      if (!confirm(`Vuoi generare un nuovo PIN per l'utente ${cognome}?`)) return;
+      const pinCasuale = Math.floor(1000 + Math.random() * 9000).toString();
+      const nuovoPinInserito = prompt(`PIN casuale generato per ${cognome}:\n\nVuoi confermare questo PIN o digitarne uno nuovo?`, pinCasuale);
+      
+      if (nuovoPinInserito === null) return;
+      
+      const pinFinale = nuovoPinInserito.trim();
+      if (!pinFinale) {
+        alert("Il PIN non può essere vuoto.");
+        return;
+      }
 
       try {
         const res = await fetch('/api/admin', {
@@ -447,12 +456,13 @@
           body: JSON.stringify({
             adminPin: currentUser.pin,
             action: 'reset-pin',
-            cognome: cognome
+            cognome: cognome,
+            newPin: pinFinale
           })
         });
         const data = await res.json();
         if (res.ok) {
-          alert(data.message);
+          alert(`PIN aggiornato con successo per ${cognome} (PIN: ${pinFinale})`);
           caricaListaUtentiAdmin();
         } else {
           alert(data.error || 'Errore durante il reset del PIN.');
