@@ -434,6 +434,16 @@
       const chiaveSlot = `${dataIso}_${ora}`;
       const occupatoDa = prenotazioniGlobali[chiaveSlot];
 
+      // 1. Controllo orario passato (impedisce di prenotare nel passato o in un'ora già trascorsa oggi)
+      const [oreSlot] = ora.split(':');
+      const dataOraSlot = new Date(`${dataIso}T${oreSlot}:00:00`);
+      const adesso = new Date();
+
+      if (dataOraSlot < adesso) {
+        alert("Non è possibile prenotare uno slot con data o orario già trascorsi!");
+        return;
+      }
+
       if (occupatoDa) {
         // Slot occupato: solo chi lo ha prenotato o l'Admin possono rilasciarlo
         const isMio = (occupatoDa.toLowerCase() === currentUser.cognome.toLowerCase());
@@ -465,7 +475,7 @@
           }
         }
 
-        // Se il limite non è superato, procedi con la prenotazione direttamente
+        // Se tutti i controlli passano, procedi con la prenotazione
         if (confirm(`Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`)) {
           prenotazioniGlobali[chiaveSlot] = currentUser.cognome;
           caricaTabellone();
