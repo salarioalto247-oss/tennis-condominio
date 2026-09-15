@@ -3,78 +3,136 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Prenotazione Campi da Tennis</title>
+  <title>Prenotazione Campi Tennis</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f9f9f9; color: #333; }
-    header { display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; background: #fff; border-bottom: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    h1 { font-size: 1.4em; margin: 0; }
-    
-    /* Stili Modale Login */
-    #login-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-    .modal-content { background: white; padding: 30px; border-radius: 8px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center; }
-    .modal-content input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-    .modal-content button { width: 100%; padding: 10px; background: #0070f3; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
-    
-    /* Pannello Gestionale Admin nascosto di default */
-    #admin-gestion-panel { display: none; margin: 20px auto; padding: 20px; background: #fff; border: 1px solid #ccc; border-radius: 8px; max-width: 960px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    .container { padding: 20px; max-width: 1000px; margin: 0 auto; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    header {
+      background-color: #fff;
+      padding: 15px 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .container {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+    /* Modale Login */
+    #login-modal {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      width: 300px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .modal-content input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .modal-content button {
+      width: 100%;
+      padding: 10px;
+      background: #0070f3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .modal-content button:hover {
+      background: #0051a2;
+    }
+    #suggerimenti-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      background: white;
+      border: 1px solid #ccc;
+      position: absolute;
+      width: calc(100% - 60px);
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+      z-index: 1001;
+    }
+    .btn-red {
+      background-color: #e53e3e !important;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-red:hover {
+      background-color: #c53030 !important;
+    }
   </style>
 </head>
 <body>
 
   <!-- Header con info utente in alto a destra -->
   <header>
-    <h1>🎾 Prenotazione Campi Tennis</h1>
-    <div id="user-info-container" style="display: flex; align-items: center; gap: 12px;">
-      <span id="logged-user-display" style="font-weight: bold; font-size: 1em; color: #0070f3;"></span>
-      
-      <!-- Pulsante Gestionale Admin (visibile solo se isAdmin = true) -->
-      <button id="admin-panel-btn" onclick="toggleAdminPanel()" style="display: none; padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-        ⚙️ Gestionale Admin
-      </button>
-      
-      <button id="logout-btn" onclick="logoutUser()" style="display: none; padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
-        Cambia Utente
-      </button>
+    <h2 style="margin: 0;">🎾 Prenotazione Campi Tennis</h2>
+    <div>
+      <span id="logged-user-display" style="margin-right: 15px; font-weight: bold;"></span>
+      <button id="admin-panel-btn" onclick="toggleAdminPanel()" style="display: none; margin-right: 10px; padding: 8px 12px; background: #3182ce; color: white; border: none; border-radius: 4px; cursor: pointer;">Pannello Admin</button>
+      <button id="logout-btn" class="btn-red" onclick="logoutUser()" style="display: none;">Cambia Utente</button>
     </div>
   </header>
 
-  <!-- Modale Pop-Up Login in Apertura con Autocompletamento -->
+  <!-- Modale Pop-Up Login -->
   <div id="login-modal" style="display: none;">
     <div class="modal-content" style="position: relative;">
-      <h2>Accesso Utente</h2>
-      <p style="font-size: 0.85em; color: #666; margin-bottom: 20px;">Inizia a digitare il tuo cognome e inserisci il PIN</p>
+      <h3>Accesso Utente</h3>
+      <p style="font-size: 13px; color: #666;">Digita il tuo cognome e il PIN.</p>
       
-      <!-- Input con tendina suggerimenti autocompletamento -->
-      <div style="position: relative; margin-bottom: 15px; text-align: left;">
-        <input type="text" id="login-cognome" placeholder="Cognome (es. Rossi o Admin)" autocomplete="off" oninput="filtraSuggerimenti(this.value)" />
-        <ul id="suggerimenti-list" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; list-style: none; margin: -15px 0 0 0; padding: 0; max-height: 140px; overflow-y: auto; display: none; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></ul>
-      </div>
+      <label style="font-size: 14px; font-weight: bold;">Cognome:</label>
+      <input type="text" id="login-cognome" placeholder="Es. Rossi, Admin..." oninput="filtraSuggerimenti(this.value)" autocomplete="off">
+      <ul id="suggerimenti-list"></ul>
 
-      <input type="password" id="login-pin" placeholder="PIN" />
-      
+      <label style="font-size: 14px; font-weight: bold;">PIN:</label>
+      <input type="password" id="login-pin" placeholder="PIN" onkeydown="if(event.key === 'Enter') handleLogin()">
+
+      <p id="login-error" style="color: red; font-size: 12px; margin: 0 0 10px 0;"></p>
       <button onclick="handleLogin()">Accedi</button>
-      <p id="login-error" style="color: red; font-size: 0.8em; margin-top: 10px;"></p>
     </div>
   </div>
 
+  <!-- Container Principale -->
   <div class="container">
-    <!-- Sezione Pannello Gestionale Admin -->
-    <div id="admin-gestion-panel">
-      <h3>Pannello di Amministrazione Utenti</h3>
-      <p>Elenco degli utenti registrati nel sistema:</p>
-      <div id="admin-users-list"></div>
-      <button onclick="toggleAdminPanel()" style="margin-top: 15px; background: #666; color: white; border:none; padding: 6px 12px; border-radius:4px; cursor:pointer;">Chiudi Pannello</button>
+    <!-- Pannello Admin (Nascosto di default) -->
+    <div id="admin-gestion-panel" style="display: none; background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <h3>Gestione Utenti (Area Riservata Admin)</h3>
+      <div id="admin-users-list">Caricamento utenti...</div>
     </div>
 
-    <!-- Tabellone prenotazioni -->
-    <h2>Tabellone Orari</h2>
-    <p>Benvenuto, <span id="current-user-span" style="font-weight:bold;"></span>. Clicca sugli slot del tabellone per prenotare o cancellare le ore direttamente.</p>
     <div id="tabellone-container">
-      <!-- Inserisci qui il tuo tabellone o calendario prenotazioni -->
+      <!-- Il tabellone verrà iniettato qui via JavaScript -->
     </div>
   </div>
 
+  <!-- Script Principale -->
   <script>
     let currentUser = null; 
     let listaUtentiCache = [];
@@ -109,6 +167,7 @@
 
     function filtraSuggerimenti(testoDigitato) {
       const listaEl = document.getElementById('suggerimenti-list');
+      if (!listaEl) return;
       listaEl.innerHTML = '';
       
       if (!testoDigitato || testoDigitato.trim() === '') {
@@ -145,12 +204,15 @@
     }
 
     function mostraModaleLogin() {
-      document.getElementById('login-modal').style.display = 'flex';
+      const modal = document.getElementById('login-modal');
+      if (modal) modal.style.display = 'flex';
     }
 
     function nascondiModaleLogin() {
-      document.getElementById('login-modal').style.display = 'none';
-      document.getElementById('suggerimenti-list').style.display = 'none';
+      const modal = document.getElementById('login-modal');
+      const sugg = document.getElementById('suggerimenti-list');
+      if (modal) modal.style.display = 'none';
+      if (sugg) sugg.style.display = 'none';
     }
 
     async function handleLogin() {
@@ -159,7 +221,7 @@
       const errorEl = document.getElementById('login-error');
 
       if (!cognomeInput || !pinInput) {
-        errorEl.textContent = 'Compila tutti i campi';
+        if (errorEl) errorEl.textContent = 'Compila tutti i campi';
         return;
       }
 
@@ -194,28 +256,33 @@
         }
         
         if (mostraErroriUI) {
-          errorEl.textContent = 'Cognome o PIN errati';
+          if (errorEl) errorEl.textContent = 'Cognome o PIN errati';
         } else {
           logoutUser();
         }
       } catch (err) {
         console.error('Errore connessione:', err);
-        if (mostraErroriUI) errorEl.textContent = 'Errore di connessione al server';
+        if (mostraErroriUI && errorEl) errorEl.textContent = 'Errore di connessione al server';
         else logoutUser();
       }
     }
 
     function aggiornaInterfacciaUtente() {
       if (!currentUser) return;
-      document.getElementById('logged-user-display').textContent = `Utente: ${currentUser.cognome} ${currentUser.isAdmin ? '(Admin)' : ''}`;
-      document.getElementById('current-user-span').textContent = currentUser.cognome;
-      document.getElementById('logout-btn').style.display = 'inline-block';
       
+      const loggedDisplay = document.getElementById('logged-user-display');
+      const logoutBtn = document.getElementById('logout-btn');
       const adminBtn = document.getElementById('admin-panel-btn');
-      if (currentUser.isAdmin) {
-        adminBtn.style.display = 'inline-block';
-      } else {
-        adminBtn.style.display = 'none';
+
+      if (loggedDisplay) loggedDisplay.textContent = `Utente: ${currentUser.cognome} ${currentUser.isAdmin ? '(Admin)' : ''}`;
+      if (logoutBtn) logoutBtn.style.display = 'inline-block';
+      
+      if (adminBtn) {
+        if (currentUser.isAdmin) {
+          adminBtn.style.display = 'inline-block';
+        } else {
+          adminBtn.style.display = 'none';
+        }
       }
     }
 
@@ -223,13 +290,15 @@
       localStorage.removeItem('tennis_user');
       localStorage.removeItem('tennis_pin');
       currentUser = null;
-      document.getElementById('admin-gestion-panel').style.display = 'none';
+      const adminPanel = document.getElementById('admin-gestion-panel');
+      if (adminPanel) adminPanel.style.display = 'none';
       mostraModaleLogin();
     }
 
     function toggleAdminPanel() {
       if (!currentUser || !currentUser.isAdmin) return;
       const panel = document.getElementById('admin-gestion-panel');
+      if (!panel) return;
       panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
       if (panel.style.display === 'block') {
         caricaListaUtentiAdmin();
@@ -250,15 +319,76 @@
             html += `<li style="margin-bottom: 5px;"><b>${u.cognome}</b> - PIN: ${u.pin} ${u.isAdmin ? '<span style="color:green; font-weight:bold;">(Admin)</span>' : ''}</li>`;
           });
           html += '</ul>';
-          document.getElementById('admin-users-list').innerHTML = html;
+          const usersListEl = document.getElementById('admin-users-list');
+          if (usersListEl) usersListEl.innerHTML = html;
         }
       } catch (e) {
         console.error('Errore caricamento lista utenti admin', e);
       }
     }
 
-    function caricaTabellone() {
+    async function caricaTabellone() {
       console.log("Tabellone pronto per l'utente loggato:", currentUser.cognome);
+      
+      const container = document.getElementById('tabellone-container') || document.querySelector('.container');
+      if (!container) return;
+      
+      let tabelloneDiv = document.getElementById('tabellone-orari-griglia');
+      if (!tabelloneDiv) {
+        tabelloneDiv = document.createElement('div');
+        tabelloneDiv.id = 'tabellone-orari-griglia';
+        tabelloneDiv.style.marginTop = '20px';
+        container.appendChild(tabelloneDiv);
+      }
+
+      try {
+        let html = `
+          <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3>Tabellone Orari Campi</h3>
+            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Clicca sugli slot disponibili per prenotare.</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+              <thead>
+                <tr style="background: #f4f4f4; text-align: left;">
+                  <th style="padding: 10px; border: 1px solid #ddd;">Orario</th>
+                  <th style="padding: 10px; border: 1px solid #ddd;">Campo 1</th>
+                  <th style="padding: 10px; border: 1px solid #ddd;">Campo 2</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        const ore = ['09:00', '10:00', '11:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+        
+        ore.forEach(ora => {
+          html += `
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #fafafa;">${ora}</td>
+              <td style="padding: 10px; border: 1px solid #ddd; cursor: pointer; text-align: center;" onclick="prenotaSlot('Campo 1', '${ora}')">
+                <span style="color: green; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Disponibile</span>
+              </td>
+              <td style="padding: 10px; border: 1px solid #ddd; cursor: pointer; text-align: center;" onclick="prenotaSlot('Campo 2', '${ora}')">
+                <span style="color: green; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Disponibile</span>
+              </td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        tabelloneDiv.innerHTML = html;
+
+      } catch (err) {
+        console.error('Errore nel caricamento del tabellone:', err);
+        tabelloneDiv.innerHTML = '<p style="color: red;">Impossibile caricare il tabellone delle prenotazioni.</p>';
+      }
+    }
+
+    function prenotaSlot(campo, ora) {
+      alert(`Utente ${currentUser.cognome}: richiesta prenotazione per ${campo} alle ore ${ora}`);
     }
   </script>
 </body>
