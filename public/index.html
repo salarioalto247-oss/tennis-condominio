@@ -136,7 +136,7 @@
   <script>
     let currentUser = null; 
     let listaUtentiCache = [];
-    let prenotazioniGlobali = {}; // Struttura: { "2026-09-16_08:00": "Rossi" }
+    let prenotazioniGlobali = {}; // Struttura: { "2026-09-16_08:00": ["Rossi", "Bianchi"] }
 
     window.addEventListener('DOMContentLoaded', async () => {
       await scaricaListaUtentiPerAutocheck();
@@ -363,8 +363,8 @@
           </div>
 
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h3>Tabellone Orari - Campo Unico</h3>
-            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Orario continuato dalle 08:00 alle 21:00 (Max 2 slot al giorno per utente).</p>
+            <h3>Tabellone Orari - Campo Unico (Supporta Singolo e Doppio)</h3>
+            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Orario continuato dalle 08:00 alle 21:00 (Max 2 slot al giorno per utente, max 2 giocatori per slot).</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <thead>
                 <tr style="background: #f4f4f4; text-align: left;">
@@ -395,13 +395,19 @@
 
           giorniArray.forEach(g => {
             const chiaveSlot = `${g.iso}_${ora}`;
-            const occupatoDa = prenotazioniGlobali[chiaveSlot];
+            const utentiSlot = prenotazioniGlobali[chiaveSlot] || []; // Array di stringhe (es. ["Rossi", "Bianchi"])
 
-            if (occupatoDa) {
-              const eMio = (occupatoDa.toLowerCase() === currentUser.cognome.toLowerCase());
+            if (utentiSlot.length > 0) {
+              const eMio = utentiSlot.some(u => u.toLowerCase() === currentUser.cognome.toLowerCase());
+              const testoNomi = utentiSlot.join(' & ');
+              const pieno = utentiSlot.length >= 2;
+
+              let bgStyle = eMio ? '#e3f2fd' : '#ffebee';
+              if (pieno) bgStyle = '#fff8e1'; // Giallino se pieno (2 giocatori)
+
               html += `
-                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; background: ${eMio ? '#e3f2fd' : '#ffebee'}; cursor: pointer;" onclick="gestisciSlot('${g.iso}', '${ora}')">
-                  <span style="color: ${eMio ? '#1565c0' : '#c62828'}; font-weight: bold; font-size: 12px;">${occupatoDa}</span>
+                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; background: ${bgStyle}; cursor: pointer;" onclick="gestisciSlot('${g.iso}', '${ora}')">
+                  <span style="color: ${eMio ? '#1565c0' : '#c62828'}; font-weight: bold; font-size: 12px;">${testoNomi} ${pieno ? '(Doppio)' : ''}</span>
                 </td>
               `;
             } else {
@@ -432,9 +438,12 @@
 
     function gestisciSlot(dataIso, ora) {
       const chiaveSlot = `${dataIso}_${ora}`;
-      const occupatoDa = prenotazioniGlobali[chiaveSlot];
+      if (!prenotazioniGlobali[chiaveSlot]) {
+        prenotazioniGlobali[chiaveSlot] = [];
+      }
+      const utentiSlot = prenotazioniGlobali[chiaveSlot];
 
-      // 1. Controllo orario passato (impedisce di prenotare nel passato o in un'ora già trascorsa oggi)
+      // 1. Controllo orario passato
       const [oreSlot] = ora.split(':');
       const dataOraSlot = new Date(`${dataIso}T${oreSlot}:00:00`);
       const adesso = new Date();
@@ -444,40 +453,60 @@
         return;
       }
 
-      if (occupatoDa) {
-        // Slot occupato: solo chi lo ha prenotato o l'Admin possono rilasciarlo
-        const isMio = (occupatoDa.toLowerCase() === currentUser.cognome.toLowerCase());
-        if (isMio || currentUser.isAdmin) {
-          const msg = currentUser.isAdmin && !isMio 
-            ? `[ADMIN] Vuoi rilasciare lo slot di ${occupatoDa} per il giorno ${dataIso} alle ore ${ora}?`
-            : `Vuoi cancellare la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`;
-            
-          if (confirm(msg)) {
+      const giaPresente = utentiSlot.some(u => u.toLowerCase() === currentUser.cognome.toLowerCase());
+
+      if (giaPresente) {
+        // L'utente è già in questo slot -> Vuole rimuovere la propria prenotazione
+        if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
+          prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
+          if (prenotazioniGlobali[chiaveSlot].length === 0) {
+            delete prenotazioniGlobali[chiaveSlot];
+          }
+          caricaTabellone();
+        }
+      } else if (currentUser.isAdmin) {
+        // L'admin può forzare inserimenti o cancellazioni
+        if (utentiSlot.length >= 2) {
+          if (confirm(`[ADMIN] Lo slot è pieno (2 giocatori). Vuoi liberarlo completamente?`)) {
             delete prenotazioniGlobali[chiaveSlot];
             caricaTabellone();
           }
         } else {
-          alert(`Questo slot è già impegnato da ${occupatoDa}. Non puoi modificarlo.`);
+          if (confirm(`[ADMIN] Vuoi aggiungere ${currentUser.cognome} a questo slot?`)) {
+            utentiSlot.push(currentUser.cognome);
+            caricaTabellone();
+          }
         }
       } else {
-        // Slot libero: verifichiamo che l'utente non abbia già 2 slot prenotati in quella giornata
-        if (!currentUser.isAdmin) {
-          let slotPrenotatiOggi = 0;
-          for (let chiave in prenotazioniGlobali) {
-            if (chiave.startsWith(dataIso) && prenotazioniGlobali[chiave].toLowerCase() === currentUser.cognome.toLowerCase()) {
+        // Utente normale che vuole aggiungersi
+        if (utentiSlot.length >= 2) {
+          alert("Questo slot ha già raggiunto il numero massimo di 2 giocatori (doppio completato).");
+          return;
+        }
+
+        // Verifica limite di 2 slot al giorno per utente
+        let slotPrenotatiOggi = 0;
+        for (let chiave in prenotazioniGlobali) {
+          if (chiave.startsWith(dataIso)) {
+            const partecipanti = prenotazioniGlobali[chiave];
+            if (partecipanti.some(u => u.toLowerCase() === currentUser.cognome.toLowerCase())) {
               slotPrenotatiOggi++;
             }
           }
-
-          if (slotPrenotatiOggi >= 2) {
-            alert(`Hai già raggiunto il limite massimo di 2 slot prenotati per il giorno ${dataIso}.`);
-            return;
-          }
         }
 
-        // Se tutti i controlli passano, procedi con la prenotazione
-        if (confirm(`Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`)) {
-          prenotazioniGlobali[chiaveSlot] = currentUser.cognome;
+        if (slotPrenotatiOggi >= 2) {
+          alert(`Hai già raggiunto il limite massimo di 2 slot prenotati per il giorno ${dataIso}.`);
+          return;
+        }
+
+        // Procedi con l'aggiunta (es. secondo giocatore per il doppio)
+        const msg = utentiSlot.length === 1 
+          ? `C'è già ${utentiSlot[0]} in questo slot. Vuoi unirti per fare il doppio il giorno ${dataIso} alle ore ${ora}?`
+          : `Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`;
+
+        if (confirm(msg)) {
+          utentiSlot.push(currentUser.cognome);
           caricaTabellone();
         }
       }
