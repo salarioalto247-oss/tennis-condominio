@@ -1,6 +1,6 @@
 // api/admin.js (Serverless Function per Vercel)
 
-// Lista utenti di default
+// Lista utenti di default[cite: 1]
 let usersJson = [
   { cognome: 'Admin', pin: '0000', isAdmin: true },
   { cognome: 'Rossi', pin: '1234', isAdmin: false },
@@ -9,6 +9,9 @@ let usersJson = [
   { cognome: 'Bonini', pin: '4321', isAdmin: false },
   { cognome: 'Maccaroni', pin: '4321', isAdmin: false }
 ];
+
+// Archivio globale condiviso per le prenotazioni (chiave: "YYYY-MM-DD_HH:00", valore: array di cognomi)
+let prenotazioniServer = {};
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,7 +28,21 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { adminPin, action, cognome, newCognome, newPin } = req.body;
+      const { adminPin, action, cognome, newCognome, newPin, bookings } = req.body;
+
+      // Gestione lettura prenotazioni (consentita anche agli utenti autenticati)
+      if (action === 'get-bookings') {
+        return res.status(200).json(prenotazioniServer);
+      }
+
+      // Gestione salvataggio prenotazioni
+      if (action === 'save-bookings') {
+        if (bookings && typeof bookings === 'object') {
+          prenotazioniServer = bookings;
+          return res.status(200).json({ success: true, message: 'Prenotazioni salvate con successo sul server' });
+        }
+        return res.status(400).json({ error: 'Dati prenotazioni non validi' });
+      }
 
       const adminUser = usersJson.find(u => u.isAdmin && u.pin === adminPin);
       const isMasterAdmin = (adminPin === '0000');
