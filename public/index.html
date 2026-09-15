@@ -42,25 +42,24 @@
       width: 300px;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .modal-content input {
+    .modal-content input, .admin-panel-input {
       width: 100%;
       padding: 10px;
-      margin-top: 10px;
-      margin-bottom: 15px;
+      margin-top: 5px;
+      margin-bottom: 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
       box-sizing: border-box;
     }
-    .modal-content button {
-      width: 100%;
-      padding: 10px;
+    .modal-content button, .admin-btn {
+      padding: 8px 12px;
       background: #0070f3;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
     }
-    .modal-content button:hover {
+    .modal-content button:hover, .admin-btn:hover {
       background: #0051a2;
     }
     #suggerimenti-list {
@@ -80,12 +79,23 @@
       background-color: #e53e3e !important;
       color: white;
       border: none;
-      padding: 8px 16px;
+      padding: 6px 12px;
       border-radius: 4px;
       cursor: pointer;
     }
     .btn-red:hover {
       background-color: #c53030 !important;
+    }
+    .btn-yellow {
+      background-color: #d69e2e !important;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-yellow:hover {
+      background-color: #b7791f !important;
     }
   </style>
 </head>
@@ -121,10 +131,34 @@
 
   <!-- Container Principale -->
   <div class="container">
-    <!-- Pannello Admin (Nascosto di default) -->
+    <!-- Pannello Admin (Console di Amministrazione Completa) -->
     <div id="admin-gestion-panel" style="display: none; background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-      <h3>Gestione Utenti (Area Riservata Admin)</h3>
-      <div id="admin-users-list">Caricamento utenti...</div>
+      <h3 style="margin-top: 0; color: #2b6cb0;">⚙️ Console di Amministrazione</h3>
+      <p style="font-size: 13px; color: #666;">Gestisci gli utenti registrati, i PIN di accesso e monitora l'anagrafica del condominio[cite: 1].</p>
+      
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+      <!-- Sezione Aggiungi Utente -->
+      <h4 style="margin-bottom: 10px;">Aggiungi Nuovo Utente</h4>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 200px;">
+          <label style="font-size: 12px; font-weight: bold;">Cognome:</label>
+          <input type="text" id="admin-new-cognome" class="admin-panel-input" placeholder="Es. Bianchi">
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+          <label style="font-size: 12px; font-weight: bold;">PIN (opzionale):</label>
+          <input type="text" id="admin-new-pin" class="admin-panel-input" placeholder="Lascia vuoto per generarlo">
+        </div>
+        <div>
+          <button class="admin-btn" onclick="aggiungiUtenteAdmin()" style="margin-bottom: 10px; height: 38px;">Aggiungi</button>
+        </div>
+      </div>
+      <p id="admin-action-msg" style="font-size: 12px; margin-top: 5px; font-weight: bold;"></p>
+
+      <h4 style="margin-top: 20px; margin-bottom: 10px;">Elenco Utenti Registrati</h4>
+      <div id="admin-users-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px;">
+        Caricamento utenti...
+      </div>
     </div>
 
     <div id="tabellone-container">
@@ -136,10 +170,11 @@
   <script>
     let currentUser = null; 
     let listaUtentiCache = [];
-    let prenotazioniGlobali = {}; // Struttura condivisa: { "2026-09-16_08:00": ["Rossi", "Bianchi"] }
+    let prenotazioniGlobali = {}; 
 
     window.addEventListener('DOMContentLoaded', async () => {
       await scaricaListaUtentiPerAutocheck();
+      caricaPrenotazioniLocali();
 
       const savedUser = localStorage.getItem('tennis_user');
       const savedPin = localStorage.getItem('tennis_pin');
@@ -150,6 +185,26 @@
         mostraModaleLogin();
       }
     });
+
+    function caricaPrenotazioniLocali() {
+      try {
+        const datiSalvati = localStorage.getItem('tennis_prenotazioni_salvate');
+        if (datiSalvati) {
+          prenotazioniGlobali = JSON.parse(datiSalvati);
+        }
+      } catch (e) {
+        console.error('Errore caricamento prenotazioni locali:', e);
+        prenotazioniGlobali = {};
+      }
+    }
+
+    function salvaPrenotazioniLocali() {
+      try {
+        localStorage.setItem('tennis_prenotazioni_salvate', JSON.stringify(prenotazioniGlobali));
+      } catch (e) {
+        console.error('Errore salvataggio prenotazioni locali:', e);
+      }
+    }
 
     async function scaricaListaUtentiPerAutocheck() {
       try {
@@ -163,36 +218,6 @@
         }
       } catch (err) {
         console.error('Errore caricamento cache utenti:', err);
-      }
-    }
-
-    // Funzione per sincronizzare e prelevare le prenotazioni dal server/calendar condiviso
-    async function sincronizzaPrenotazioni() {
-      try {
-        const response = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminPin: currentUser.pin, action: 'get-bookings' })
-        });
-        const data = await response.json();
-        if (response.ok && data && typeof data === 'object') {
-          prenotazioniGlobali = data;
-        }
-      } catch (err) {
-        console.error('Errore sincronizzazione prenotazioni:', err);
-      }
-    }
-
-    // Funzione per salvare le prenotazioni sul server condiviso
-    async function salvaPrenotazioniServer() {
-      try {
-        await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminPin: currentUser.pin, action: 'save-bookings', bookings: prenotazioniGlobali })
-        });
-      } catch (err) {
-        console.error('Errore salvataggio prenotazioni:', err);
       }
     }
 
@@ -270,6 +295,7 @@
         const data = await response.json();
 
         if (response.ok && Array.isArray(data)) {
+          listaUtentiCache = data;
           const userFound = data.find(u => u.cognome.toLowerCase() === cognome.toLowerCase() && u.pin === pin);
           const isMaster = (cognome.toLowerCase() === 'admin' && pin === '0000');
 
@@ -281,7 +307,7 @@
 
             nascondiModaleLogin();
             aggiornaInterfacciaUtente();
-            await caricaTabellone();
+            caricaTabellone();
             return;
           }
         }
@@ -345,11 +371,23 @@
         });
         const users = await res.json();
         if (res.ok && Array.isArray(users)) {
-          let html = '<ul style="padding-left: 20px;">';
+          listaUtentiCache = users;
+          let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+          html += '<tr style="background: #f4f4f4; text-align: left;"><th style="padding: 6px; border: 1px solid #ddd;">Cognome</th><th style="padding: 6px; border: 1px solid #ddd;">PIN</th><th style="padding: 6px; border: 1px solid #ddd; text-align: center;">Azioni</th></tr>';
+          
           users.forEach(u => {
-            html += `<li style="margin-bottom: 5px;"><b>${u.cognome}</b> - PIN: ${u.pin} ${u.isAdmin ? '<span style="color:green; font-weight:bold;">(Admin)</span>' : ''}</li>`;
+            html += `
+              <tr>
+                <td style="padding: 6px; border: 1px solid #ddd;"><b>${u.cognome}</b> ${u.isAdmin ? '<span style="color:green;">(Admin)</span>' : ''}</td>
+                <td style="padding: 6px; border: 1px solid #ddd;">${u.pin}</td>
+                <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">
+                  <button class="btn-yellow" onclick="resettaPinAdmin('${u.cognome}')" style="font-size: 11px; margin-right: 5px;">Reset PIN</button>
+                  ${u.cognome.toLowerCase() !== 'admin' ? `<button class="btn-red" onclick="eliminaUtenteAdmin('${u.cognome}')" style="font-size: 11px;">Elimina</button>` : ''}
+                </td>
+              </tr>
+            `;
           });
-          html += '</ul>';
+          html += '</table>';
           const usersListEl = document.getElementById('admin-users-list');
           if (usersListEl) usersListEl.innerHTML = html;
         }
@@ -358,9 +396,101 @@
       }
     }
 
-    async function caricaTabellone() {
-      // Sincronizza lo stato globale prima di disegnare la griglia
-      await sincronizzaPrenotazioni();
+    async function aggiungiUtenteAdmin() {
+      const cognome = document.getElementById('admin-new-cognome').value.trim();
+      const pin = document.getElementById('admin-new-pin').value.trim();
+      const msgEl = document.getElementById('admin-action-msg');
+
+      if (!cognome) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Inserisci un cognome valido.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminPin: currentUser.pin,
+            action: 'add',
+            cognome: cognome,
+            newPin: pin || undefined
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msgEl.style.color = 'green';
+          msgEl.textContent = data.message;
+          document.getElementById('admin-new-cognome').value = '';
+          document.getElementById('admin-new-pin').value = '';
+          caricaListaUtentiAdmin();
+          scaricaListaUtentiPerAutocheck();
+        } else {
+          msgEl.style.color = 'red';
+          msgEl.textContent = data.error || 'Errore durante l aggiunta.';
+        }
+      } catch (e) {
+        console.error(e);
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Errore di connessione al server.';
+      }
+    }
+
+    async function resettaPinAdmin(cognome) {
+      if (!confirm(`Vuoi generare un nuovo PIN per l'utente ${cognome}?`)) return;
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminPin: currentUser.pin,
+            action: 'reset-pin',
+            cognome: cognome
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(data.message);
+          caricaListaUtentiAdmin();
+        } else {
+          alert(data.error || 'Errore durante il reset del PIN.');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Errore di connessione al server.');
+      }
+    }
+
+    async function eliminaUtenteAdmin(cognome) {
+      if (!confirm(`Sei sicuro di voler eliminare l'utente ${cognome}?`)) return;
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminPin: currentUser.pin,
+            action: 'delete',
+            cognome: cognome
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          caricaListaUtentiAdmin();
+          scaricaListaUtentiPerAutocheck();
+        } else {
+          alert(data.error || 'Errore durante l eliminazione.');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Errore di connessione al server.');
+      }
+    }
+
+    function caricaTabellone() {
+      caricaPrenotazioniLocali();
 
       const container = document.getElementById('tabellone-container') || document.querySelector('.container');
       if (!container) return;
@@ -396,8 +526,8 @@
           </div>
 
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h3>Tabellone Orari - Campo Unico (Condiviso)</h3>
-            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b>. Orario continuato dalle 08:00 alle 21:00 (Max 2 slot al giorno per utente, max 2 giocatori per slot).</p>
+            <h3>Tabellone Orari - Campo Unico</h3>
+            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b> ${currentUser.isAdmin ? '<span style="color: #2b6cb0; font-weight: bold;">[Modalità Admin: Gestione Totale]</span>' : ''}. Orario continuato dalle 08:00 alle 21:00.</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <thead>
                 <tr style="background: #f4f4f4; text-align: left;">
@@ -469,9 +599,8 @@
       }
     }
 
-    async function gestisciSlot(dataIso, ora) {
-      // Sincronizza prima di effettuare modifiche per evitare conflitti
-      await sincronizzaPrenotazioni();
+    function gestisciSlot(dataIso, ora) {
+      caricaPrenotazioniLocali();
 
       const chiaveSlot = `${dataIso}_${ora}`;
       if (!prenotazioniGlobali[chiaveSlot]) {
@@ -479,13 +608,51 @@
       }
       const utentiSlot = prenotazioniGlobali[chiaveSlot];
 
-      // 1. Controllo orario passato
       const [oreSlot] = ora.split(':');
       const dataOraSlot = new Date(`${dataIso}T${oreSlot}:00:00`);
       const adesso = new Date();
 
-      if (dataOraSlot < adesso) {
+      if (dataOraSlot < adesso && !currentUser.isAdmin) {
         alert("Non è possibile prenotare uno slot con data o orario già trascorsi!");
+        return;
+      }
+
+      if (currentUser.isAdmin) {
+        if (utentiSlot.length === 0) {
+          const cognomeCondomino = prompt("[ADMIN] Inserisci il cognome del condomino per cui effettuare la prenotazione:");
+          if (cognomeCondomino && cognomeCondomino.trim() !== '') {
+            utentiSlot.push(cognomeCondomino.trim());
+            salvaPrenotazioniLocali();
+            caricaTabellone();
+          }
+        } else {
+          const scelta = prompt(`[ADMIN] Slot occupato da: [ ${utentiSlot.join(' - ')} ]\nScegli un'opzione:\n1. Rimuovi un utente\n2. Libera tutto lo slot\n3. Aggiungi un secondo utente (Doppio)\n\nDigita 1, 2 o 3:`);
+          
+          if (scelta === '1') {
+            const utenteDaRimuovere = prompt(`Digita esattamente il cognome dell'utente da rimuovere (${utentiSlot.join(', ')}):`);
+            if (utenteDaRimuovere) {
+              prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== utenteDaRimuovere.trim().toLowerCase());
+              if (prenotazioniGlobali[chiaveSlot].length === 0) delete prenotazioniGlobali[chiaveSlot];
+              salvaPrenotazioniLocali();
+              caricaTabellone();
+            }
+          } else if (scelta === '2') {
+            delete prenotazioniGlobali[chiaveSlot];
+            salvaPrenotazioniLocali();
+            caricaTabellone();
+          } else if (scelta === '3') {
+            if (utentiSlot.length >= 2) {
+              alert("Lo slot ha già 2 giocatori.");
+            } else {
+              const nuovoUtente = prompt("Inserisci il cognome del secondo condomino:");
+              if (nuovoUtente && nuovoUtente.trim() !== '') {
+                utentiSlot.push(nuovoUtente.trim());
+                salvaPrenotazioniLocali();
+                caricaTabellone();
+              }
+            }
+          }
+        }
         return;
       }
 
@@ -497,22 +664,8 @@
           if (prenotazioniGlobali[chiaveSlot].length === 0) {
             delete prenotazioniGlobali[chiaveSlot];
           }
-          await salvaPrenotazioniServer();
-          await caricaTabellone();
-        }
-      } else if (currentUser.isAdmin) {
-        if (utentiSlot.length >= 2) {
-          if (confirm(`[ADMIN] Lo slot è pieno (2 giocatori). Vuoi liberarlo completamente?`)) {
-            delete prenotazioniGlobali[chiaveSlot];
-            await salvaPrenotazioniServer();
-            await caricaTabellone();
-          }
-        } else {
-          if (confirm(`[ADMIN] Vuoi aggiungere ${currentUser.cognome} a questo slot?`)) {
-            utentiSlot.push(currentUser.cognome);
-            await salvaPrenotazioniServer();
-            await caricaTabellone();
-          }
+          salvaPrenotazioniLocali();
+          caricaTabellone();
         }
       } else {
         if (utentiSlot.length >= 2) {
@@ -520,7 +673,6 @@
           return;
         }
 
-        // Verifica limite di 2 slot al giorno per utente
         let slotPrenotatiOggi = 0;
         for (let chiave in prenotazioniGlobali) {
           if (chiave.startsWith(dataIso)) {
@@ -542,8 +694,8 @@
 
         if (confirm(msg)) {
           utentiSlot.push(currentUser.cognome);
-          await salvaPrenotazioniServer();
-          await caricaTabellone();
+          salvaPrenotazioniLocali();
+          caricaTabellone();
         }
       }
     }
