@@ -1,105 +1,90 @@
-// api/admin.js (Serverless Function per Vercel)
-
-// Lista utenti di default[cite: 1]
-let usersJson = [
-  { cognome: 'Admin', pin: '0000', isAdmin: true },
-  { cognome: 'Rossi', pin: '1234', isAdmin: false },
-  { cognome: 'Giliberti', pin: '1234', isAdmin: false },
-  { cognome: 'Cataliotti', pin: '1234', isAdmin: false },
-  { cognome: 'Bonini', pin: '4321', isAdmin: false },
-  { cognome: 'Maccaroni', pin: '4321', isAdmin: false }
-];
-
-// Archivio globale condiviso per le prenotazioni (chiave: "YYYY-MM-DD_HH:00", valore: array di cognomi)
-let prenotazioniServer = {};
+// Esempio di codice per il file api/admin.js sul server Vercel
+// (Adatta la logica di lettura/scrittura in base a come memorizzi gli utenti, es. file JSON o DB)
 
 export default async function handler(req, res) {
+  // Imposta le intestazioni CORS se necessario
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
-    return res.status(204).end();
+    return res.status(200).end();
   }
 
-  try {
-    if (req.method === 'GET') {
-      return res.status(200).json(usersJson);
-    }
+  // Esempio di elenco utenti in memoria o persistito (sostituisci con la tua logica di storage reale)
+  // Nota: se usi un file JSON o un DB, carica qui i dati.
+  let utenti = [
+    { cognome: 'Admin', pin: '0000', isAdmin: true },
+    { cognome: 'Rossi', pin: '1234', isAdmin: false },
+    { cognome: 'Giliberti', pin: '1234', isAdmin: false },
+    { cognome: 'Cataliotti', pin: '1234', isAdmin: false },
+    { cognome: 'Bonini', pin: '4321', isAdmin: false },
+    { cognome: 'Maccaroni', pin: '4321', isAdmin: false }
+  ];
 
-    if (req.method === 'POST') {
-      const { adminPin, action, cognome, newCognome, newPin, bookings } = req.body;
-
-      // Gestione lettura prenotazioni (consentita anche agli utenti autenticati)
-      if (action === 'get-bookings') {
-        return res.status(200).json(prenotazioniServer);
-      }
-
-      // Gestione salvataggio prenotazioni
-      if (action === 'save-bookings') {
-        if (bookings && typeof bookings === 'object') {
-          prenotazioniServer = bookings;
-          return res.status(200).json({ success: true, message: 'Prenotazioni salvate con successo sul server' });
-        }
-        return res.status(400).json({ error: 'Dati prenotazioni non validi' });
-      }
-
-      const adminUser = usersJson.find(u => u.isAdmin && u.pin === adminPin);
-      const isMasterAdmin = (adminPin === '0000');
-
-      if (action !== 'get-users' && !adminUser && !isMasterAdmin) {
-        return res.status(401).json({ error: 'PIN Amministratore non valido' });
-      }
-
-      if (action === 'get-users') {
-        return res.status(200).json(usersJson);
-      }
-
-      if (action === 'add') {
-        if (!cognome) return res.status(400).json({ error: 'Cognome obbligatorio' });
-        const generatedPin = newPin || Math.floor(1000 + Math.random() * 9000).toString();
-        
-        if (usersJson.some(u => u.cognome.toLowerCase() === cognome.toLowerCase())) {
-          return res.status(400).json({ error: 'Utente già esistente' });
-        }
-
-        usersJson.push({ cognome, pin: generatedPin, isAdmin: false });
-        return res.status(200).json({ success: true, message: `Utente ${cognome} aggiunto con PIN: ${generatedPin}` });
-      }
-
-      if (action === 'edit') {
-        const user = usersJson.find(u => u.cognome.toLowerCase() === cognome.toLowerCase());
-        if (!user) return res.status(404).json({ error: 'Utente non trovato' });
-
-        if (newCognome) user.cognome = newCognome;
-        if (newPin) user.pin = newPin;
-
-        return res.status(200).json({ success: true, message: 'Utente aggiornato con successo' });
-      }
-
-      if (action === 'reset-pin') {
-        const user = usersJson.find(u => u.cognome.toLowerCase() === cognome.toLowerCase());
-        if (!user) return res.status(404).json({ error: 'Utente non trovato' });
-
-        const generatedPin = newPin || Math.floor(1000 + Math.random() * 9000).toString();
-        user.pin = generatedPin;
-        return res.status(200).json({ success: true, message: `PIN aggiornato per ${cognome}: ${generatedPin}` });
-      }
-
-      if (action === 'delete') {
-        if (cognome.toLowerCase() === 'admin') {
-          return res.status(400).json({ error: 'Impossibile eliminare l account Admin principale' });
-        }
-        usersJson = usersJson.filter(u => u.cognome.toLowerCase() !== cognome.toLowerCase());
-        return res.status(200).json({ success: true, message: `Utente ${cognome} rimosso` });
-      }
-
-      return res.status(400).json({ error: 'Azione non riconosciuta' });
-    }
-
-    return res.status(405).json({ error: 'Metodo non consentito' });
-  } catch (err) {
-    console.error('Errore serverless:', err);
-    return res.status(500).json({ error: 'Errore interno del server' });
+  if (req.method === 'GET') {
+    // Restituisce la lista pubblica degli utenti (senza mostrare i PIN se preferisci, o con i PIN se richiesto)
+    return res.status(200).json(utenti);
   }
+
+  if (req.method === 'POST') {
+    const { adminPin, action, cognome, newPin, vecchioCognome, nuovoCognome } = req.body;
+
+    // Verifica che l'utente che compie l'azione sia l'Admin principale
+    if (adminPin !== '0000') {
+      return res.status(401).json({ error: 'Non autorizzato. Solo l Admin può eseguire questa azione.' });
+    }
+
+    if (action === 'get-users') {
+      return res.status(200).json(utenti);
+    }
+
+    if (action === 'add') {
+      if (!cognome) return res.status(400).json({ error: 'Cognome obbligatorio' });
+      const pinDaAssegnare = newPin || Math.floor(1000 + Math.random() * 9000).toString();
+      
+      // Controlla se esiste già
+      if (utenti.some(u => u.cognome.toLowerCase() === cognome.toLowerCase())) {
+        return res.status(400).json({ error: 'Utente già esistente.' });
+      }
+
+      utenti.push({ cognome: cognome.trim(), pin: pinDaAssegnare, isAdmin: false });
+      return res.status(200).json({ message: `Utente ${cognome} aggiunto con successo (PIN: ${pinDaAssegnare})` });
+    }
+
+    if (action === 'reset-pin') {
+      const utente = utenti.find(u => u.cognome.toLowerCase() === cognome.toLowerCase());
+      if (!utente) return res.status(404).json({ error: 'Utente non trovato.' });
+
+      // Se viene passato newPin lo usa (Modifica manuale), altrimenti ne genera uno random (Reset)
+      const pinFinale = newPin || Math.floor(1000 + Math.random() * 9000).toString();
+      utente.pin = pinFinale;
+
+      return res.status(200).json({ message: 'PIN aggiornato con successo', pin: pinFinale });
+    }
+
+    if (action === 'update-cognome') {
+      if (!vecchioCognome || !nuovoCognome) {
+        return res.status(400).json({ error: 'Vecchio e nuovo cognome sono obbligatori.' });
+      }
+      
+      const utente = utenti.find(u => u.cognome.toLowerCase() === vecchioCognome.toLowerCase());
+      if (!utente) return res.status(404).json({ error: 'Utente non trovato.' });
+
+      utente.cognome = nuovoCognome.trim();
+      return res.status(200).json({ message: 'Cognome aggiornato con successo' });
+    }
+
+    if (action === 'delete') {
+      if (cognome.toLowerCase() === 'admin') {
+        return res.status(400).json({ error: 'Non puoi eliminare l account Admin principale.' });
+      }
+      utenti = utenti.filter(u => u.cognome.toLowerCase() !== cognome.toLowerCase());
+      return res.status(200).json({ message: 'Utente eliminato con successo' });
+    }
+
+    return res.status(400).json({ error: 'Azione non riconosciuta' });
+  }
+
+  return res.status(405).json({ error: 'Metodo non consentito' });
 }
