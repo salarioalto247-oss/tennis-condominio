@@ -747,19 +747,20 @@
         return;
       }
 
-      // Logica utente standard con supporto al doppio e controllo limite giornaliero
-      const giaPresente = utentiSlot.filter(u => u.toLowerCase() === currentUser.cognome.toLowerCase());
+      // Conta quante volte l'utente corrente è presente in questo specifico slot
+      const occorrenzeMioNome = utentiSlot.filter(u => u.toLowerCase() === currentUser.cognome.toLowerCase()).length;
 
-      if (giaPresente.length > 0) {
-        if (giaPresente.length === 1) {
-          const scelta = confirm(
+      if (occorrenzeMioNome > 0) {
+        if (occorrenzeMioNome === 1 && utentiSlot.length === 1) {
+          // L'utente è presente da solo: offriamo la scelta tra raddoppiare o cancellare
+          const sceltaDoppio = confirm(
             "Risulti già prenotato in questo slot.\n\n" +
             "• Premi OK per aggiungere una seconda volta il tuo cognome (Doppio)\n" +
-            "• Premi Annulla per cancellare la prenotazione esistente"
+            "• Premi Annulla per cancellare la prenotazione"
           );
 
-          if (scelta) {
-            // Verifica se ha altre prenotazioni in altri slot nello stesso giorno
+          if (sceltaDoppio) {
+            // Controlla se ha prenotato altrove nello stesso giorno
             let slotPrenotatiOggi = 0;
             for (let chiave in prenotazioniGlobali) {
               if (chiave.startsWith(dataIso)) {
@@ -771,15 +772,8 @@
               }
             }
 
-            // slotPrenotatiOggi include la prenotazione corrente in questo slot.
-            // Se è > 1, significa che ha prenotato anche altrove oggi.
             if (slotPrenotatiOggi > 1) {
               alert("Hai già effettuato prenotazioni in altri orari oggi. Puoi raddoppiare solo sullo stesso slot.");
-              return;
-            }
-
-            if (utentiSlot.length >= 2) {
-              alert("Questo slot ha già raggiunto il numero massimo di 2 giocatori.");
               return;
             }
 
@@ -787,7 +781,7 @@
             salvaPrenotazioniLocali();
             caricaTabellone();
           } else {
-            // Cancella la prenotazione singola esistente in questo slot
+            // Cancella la prenotazione
             prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
             if (prenotazioniGlobali[chiaveSlot].length === 0) {
               delete prenotazioniGlobali[chiaveSlot];
@@ -796,8 +790,8 @@
             caricaTabellone();
           }
         } else {
-          // Presente 2 volte nello slot
-          if (confirm("Vuoi rimuovere la tua seconda prenotazione da questo slot?")) {
+          // Se ci sono già due utenti o l'utente è presente due volte, chiediamo semplicemente se vuole rimuovere la prenotazione
+          if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
             let rimosso = false;
             prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => {
               if (!rimosso && u.toLowerCase() === currentUser.cognome.toLowerCase()) {
@@ -814,12 +808,13 @@
           }
         }
       } else {
+        // Slot vuoto o occupato da altri
         if (utentiSlot.length >= 2) {
-          alert("Questo slot ha già raggiunto il numero massimo di 2 giocatori (doppio completato).");
+          alert("Questo slot ha già raggiunto il massimo di 2 giocatori.");
           return;
         }
 
-        // Conta le prenotazioni totali dell'utente in questa giornata
+        // Controllo limite giornaliero
         let slotPrenotatiOggi = 0;
         for (let chiave in prenotazioniGlobali) {
           if (chiave.startsWith(dataIso)) {
