@@ -27,13 +27,13 @@
 
     <div class="card">
         <h2>1. Lettura Stato (GET Prenotazioni)</h2>
-        <p>Interroga Google Calendar per visualizzare tutte le prenotazioni attive[cite: 2].</p>
+        <p>Interroga Google Calendar per visualizzare tutte le prenotazioni attive.</p>
         <button onclick="eseguiGet()">Leggi Prenotazioni</button>
     </div>
 
     <div class="card">
         <h2>2. Scrittura Test (POST Salva Prenotazione)</h2>
-        <p>Invia una prenotazione di test per verificare la scrittura sul calendario[cite: 2].</p>
+        <p>Invia una prenotazione di test per verificare la scrittura sul calendario.</p>
         <div class="flex">
             <div>
                 <label for="testData">Data (YYYY-MM-DD):</label>
@@ -121,7 +121,7 @@
 
         async function eseguiCancella() {
             const url = document.getElementById('apiUrl').value;
-            const dataStr = document.getElementById('testData'].value;
+            const dataStr = document.getElementById('testData').value;
             const oraStr = document.getElementById('testOra').value;
 
             const chiave = `${dataStr}_${oraStr}`;
