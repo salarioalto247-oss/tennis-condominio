@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Prenotazione Campi Tennis</title>
+  <title>Intercondominio Salario Alto - Prenotazione Campo Tennis</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -114,7 +114,7 @@
 
   <!-- Header con info utente in alto a destra -->
   <header>
-    <h2 style="margin: 0;">🎾 Prenotazione Campi Tennis</h2>
+    <h2 style="margin: 0;">🎾 Intercondominio Salario Alto - Prenotazione Campo Tennis</h2>
     <div>
       <span id="logged-user-display" style="margin-right: 15px; font-weight: bold;"></span>
       <button id="admin-panel-btn" onclick="toggleAdminPanel()" style="display: none; margin-right: 10px; padding: 8px 12px; background: #3182ce; color: white; border: none; border-radius: 4px; cursor: pointer;">Pannello Admin</button>
@@ -616,7 +616,7 @@
           </div>
 
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h3>Tabellone Orari - Campo da Tennis Via Suvereto 247</h3>
+            <h3>Intercondominio Salario Alto - Tabellone Orari - Campo da Tennis Via Suvereto 247</h3>
             <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b> ${currentUser.isAdmin ? '<span style="color: #2b6cb0; font-weight: bold;">[Modalità Admin: Gestione Totale]</span>' : ''}. Orario continuato dalle 08:00 alle 21:00.</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <thead>
@@ -747,16 +747,71 @@
         return;
       }
 
-      const giaPresente = utentiSlot.some(u => u.toLowerCase() === currentUser.cognome.toLowerCase());
+      // Logica utente standard con supporto al doppio e controllo limite giornaliero
+      const giaPresente = utentiSlot.filter(u => u.toLowerCase() === currentUser.cognome.toLowerCase());
 
-      if (giaPresente) {
-        if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
-          prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-          if (prenotazioniGlobali[chiaveSlot].length === 0) {
-            delete prenotazioniGlobali[chiaveSlot];
+      if (giaPresente.length > 0) {
+        if (giaPresente.length === 1) {
+          const scelta = confirm(
+            "Risulti già prenotato in questo slot.\n\n" +
+            "• Premi OK per aggiungere una seconda volta il tuo cognome (Doppio)\n" +
+            "• Premi Annulla per cancellare la prenotazione esistente"
+          );
+
+          if (scelta) {
+            // Verifica se ha altre prenotazioni in altri slot nello stesso giorno
+            let slotPrenotatiOggi = 0;
+            for (let chiave in prenotazioniGlobali) {
+              if (chiave.startsWith(dataIso)) {
+                prenotazioniGlobali[chiave].forEach(u => {
+                  if (u.toLowerCase() === currentUser.cognome.toLowerCase()) {
+                    slotPrenotatiOggi++;
+                  }
+                });
+              }
+            }
+
+            // slotPrenotatiOggi include la prenotazione corrente in questo slot.
+            // Se è > 1, significa che ha prenotato anche altrove oggi.
+            if (slotPrenotatiOggi > 1) {
+              alert("Hai già effettuato prenotazioni in altri orari oggi. Puoi raddoppiare solo sullo stesso slot.");
+              return;
+            }
+
+            if (utentiSlot.length >= 2) {
+              alert("Questo slot ha già raggiunto il numero massimo di 2 giocatori.");
+              return;
+            }
+
+            utentiSlot.push(currentUser.cognome);
+            salvaPrenotazioniLocali();
+            caricaTabellone();
+          } else {
+            // Cancella la prenotazione singola esistente in questo slot
+            prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
+            if (prenotazioniGlobali[chiaveSlot].length === 0) {
+              delete prenotazioniGlobali[chiaveSlot];
+            }
+            salvaPrenotazioniLocali();
+            caricaTabellone();
           }
-          salvaPrenotazioniLocali();
-          caricaTabellone();
+        } else {
+          // Presente 2 volte nello slot
+          if (confirm("Vuoi rimuovere la tua seconda prenotazione da questo slot?")) {
+            let rimosso = false;
+            prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => {
+              if (!rimosso && u.toLowerCase() === currentUser.cognome.toLowerCase()) {
+                rimosso = true;
+                return false;
+              }
+              return true;
+            });
+            if (prenotazioniGlobali[chiaveSlot].length === 0) {
+              delete prenotazioniGlobali[chiaveSlot];
+            }
+            salvaPrenotazioniLocali();
+            caricaTabellone();
+          }
         }
       } else {
         if (utentiSlot.length >= 2) {
@@ -764,18 +819,20 @@
           return;
         }
 
+        // Conta le prenotazioni totali dell'utente in questa giornata
         let slotPrenotatiOggi = 0;
         for (let chiave in prenotazioniGlobali) {
           if (chiave.startsWith(dataIso)) {
-            const partecipanti = prenotazioniGlobali[chiave];
-            if (partecipanti.some(u => u.toLowerCase() === currentUser.cognome.toLowerCase())) {
-              slotPrenotatiOggi++;
-            }
+            prenotazioniGlobali[chiave].forEach(u => {
+              if (u.toLowerCase() === currentUser.cognome.toLowerCase()) {
+                slotPrenotatiOggi++;
+              }
+            });
           }
         }
 
-        if (slotPrenotatiOggi >= 2) {
-          alert(`Hai già raggiunto il limite massimo di 2 slot prenotati per il giorno ${dataIso}.`);
+        if (slotPrenotatiOggi >= 1) {
+          alert("Hai già effettuato una prenotazione in questo giorno. Puoi prenotare un secondo slot solo per raddoppiare sullo stesso orario.");
           return;
         }
 
