@@ -142,14 +142,13 @@
 
   <!-- Container Principale -->
   <div class="container">
-    <!-- Pannello Admin (Console di Amministrazione Completa) -->
+    <!-- Pannello Admin -->
     <div id="admin-gestion-panel" style="display: none; background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
       <h3 style="margin-top: 0; color: #2b6cb0;">⚙️ Console di Amministrazione</h3>
       <p style="font-size: 13px; color: #666;">Gestisci gli utenti registrati, i PIN di accesso e monitora l'anagrafica del condominio.</p>
       
       <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
-      <!-- Sezione Aggiungi Utente -->
       <h4 style="margin-bottom: 10px;">Aggiungi Nuovo Utente</h4>
       <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
         <div style="flex: 1; min-width: 200px;">
@@ -171,7 +170,6 @@
         Caricamento utenti...
       </div>
 
-      <!-- Registro Attività (Audit Log) -->
       <h4 style="margin-top: 30px; margin-bottom: 10px;">📋 Registro Attività e Modifiche (Audit Log)</h4>
       <button class="btn-blue" onclick="caricaLogAdmin()" style="margin-bottom: 10px; font-size: 11px;">Aggiorna Log</button>
       <div id="admin-logs-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px; background: #fafafa; font-size: 12px; font-family: monospace;">
@@ -208,13 +206,15 @@
         const response = await fetch('/api/admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminPin: currentUser ? currentUser.pin : '0000', action: 'get-prenotazioni' })
+          body: JSON.stringify({ 
+            adminPin: currentUser ? currentUser.pin : '0000', 
+            action: 'get-prenotazioni' 
+          })
         });
         const data = await response.json();
         if (response.ok && data) {
           prenotazioniGlobali = data;
         } else {
-          console.error('Errore risposta prenotazioni:', data);
           prenotazioniGlobali = {};
         }
       } catch (e) {
@@ -229,11 +229,11 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            adminPin: currentUser.pin,
+            adminPin: currentUser ? currentUser.pin : '0000',
             action: 'save-prenotazione',
             chiave: chiaveSlot,
             utenti: utentiArray,
-            cognome: currentUser.cognome
+            cognome: currentUser ? currentUser.cognome : 'Admin'
           })
         });
         const data = await response.json();
@@ -689,7 +689,6 @@
         }
 
         let html = `
-          <!-- Didascalia informativa come da PDF -->
           <div style="background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 12px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; line-height: 1.4; text-transform: uppercase;">
             N.B. SI PUO' PRENOTARE AL MASSIMO FINO A DUE GIORNI SUCCESSIVI<br>
             LE PRENOTAZIONI EFFETTUATE IN ANTICIPO SARANNO CANCELLATE
@@ -805,7 +804,7 @@
               prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== utenteDaRimuovere.trim().toLowerCase());
               const nuoviUtenti = prenotazioniGlobali[chiaveSlot];
               if (nuoviUtenti.length === 0) delete prenotazioniGlobali[chiaveSlot];
-              await salvaPrenotazioneGoogle(chiaveSlot,nuoviUtenti);
+              await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti);
               await caricaTabellone();
             }
           } else if (scelta === '2') {
@@ -874,7 +873,7 @@
               }
               return true;
             });
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
+            prenotazioniGlobali[chiaveSlot] = nuevosUtenti = nuoviUtenti;
             await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti);
             await caricaTabellone();
           }
