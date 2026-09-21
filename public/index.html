@@ -827,30 +827,31 @@
         return;
       }
 
-      const occorrenzeMioNome = utentiSlot.filter(u => u.toLowerCase() === currentUser.cognome.toLowerCase()).length;
+      // Calcolo preciso di quante volte il cognome compare in TUTTI gli slot di questa giornata
+      let slotPrenotatiOggi = 0;
+      for (let chiave in prenotazioniGlobali) {
+        if (chiave.startsWith(dataIso)) {
+          prenotazioniGlobali[chiave].forEach(u => {
+            if (u.toLowerCase() === currentUser.cognome.toLowerCase()) {
+              slotPrenotatiOggi++;
+            }
+          });
+        }
+      }
 
-      if (occorrenzeMioNome > 0) {
-        if (occorrenzeMioNome === 1 && utentiSlot.length === 1) {
+      const occorrenzeMioNomeInQuestoSlot = utentiSlot.filter(u => u.toLowerCase() === currentUser.cognome.toLowerCase()).length;
+
+      if (occorrenzeMioNomeInQuestoSlot > 0) {
+        if (occorrenzeMioNomeInQuestoSlot === 1 && utentiSlot.length === 1) {
           const sceltaDoppio = confirm(
             "Risulti già prenotato in questo slot.\n\n" +
-            "• Premi OK per aggiungere una seconda volta il tuo cognome (Doppio)\n" +
+            "• Premi OK per aggiungere una seconda volta il tuo cognome (Raddoppio / Doppio)\n" +
             "• Premi Annulla per cancellare la prenotazione"
           );
 
           if (sceltaDoppio) {
-            let slotPrenotatiOggi = 0;
-            for (let chiave in prenotazioniGlobali) {
-              if (chiave.startsWith(dataIso)) {
-                prenotazioniGlobali[chiave].forEach(u => {
-                  if (u.toLowerCase() === currentUser.cognome.toLowerCase()) {
-                    slotPrenotatiOggi++;
-                  }
-                });
-              }
-            }
-
-            if (slotPrenotatiOggi > 1) {
-              alert("Hai già effettuato prenotazioni in altri orari oggi. Puoi raddoppiare solo sullo stesso slot.");
+            if (slotPrenotatiOggi >= 2) {
+              alert("Hai già raggiunto il limite massimo di 2 prenotazioni per questa giornata.");
               return;
             }
 
@@ -873,7 +874,7 @@
               }
               return true;
             });
-            prenotazioniGlobali[chiaveSlot] = nuevosUtenti = nuoviUtenti;
+            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
             await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti);
             await caricaTabellone();
           }
@@ -884,19 +885,8 @@
           return;
         }
 
-        let slotPrenotatiOggi = 0;
-        for (let chiave in prenotazioniGlobali) {
-          if (chiave.startsWith(dataIso)) {
-            prenotazioniGlobali[chiave].forEach(u => {
-              if (u.toLowerCase() === currentUser.cognome.toLowerCase()) {
-                slotPrenotatiOggi++;
-              }
-            });
-          }
-        }
-
-        if (slotPrenotatiOggi >= 1) {
-          alert("Hai già effettuato una prenotazione in questo giorno. Puoi prenotare un secondo slot solo per raddoppiare sullo stesso orario.");
+        if (slotPrenotatiOggi >= 2) {
+          alert("Hai già effettuato il limite massimo di 2 prenotazioni per questa giornata.");
           return;
         }
 
