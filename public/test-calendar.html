@@ -2,55 +2,148 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Test Connessione Google Calendar</title>
+    <title>Debug Console - Tennis Calendar</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        button { background: #0070f3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #0051a2; }
-        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; overflow-x: auto; }
-        .loading { color: #666; font-style: italic; }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 30px auto; padding: 20px; background: #f4f4f9; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { margin-top: 0; color: #0070f3; }
+        label { font-weight: bold; font-size: 14px; }
+        input, select { width: 100%; padding: 8px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #0070f3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px; margin-right: 10px; margin-bottom: 10px; }
+        button.secondary { background: #6c757d; }
+        button:hover { opacity: 0.9; }
+        pre { background: #1e1e1e; color: #4ec9b0; padding: 15px; border-radius: 5px; overflow-x: auto; max-height: 300px; font-size: 13px; }
+        .flex { display: flex; gap: 10px; }
+        .flex > div { flex: 1; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>Test Connessione Google Calendar</h2>
-        <p>Questo script interroga l'endpoint backend per leggere gli eventi direttamente dal Google Calendar condiviso.</p>
-        
-        <label for="apiUrl">URL Backend Vercel (o locale):</label><br>
-        <input type="text" id="apiUrl" value="https://tennis-condominio-tau.vercel.app/api/admin" style="width: 100%; padding: 8px; margin: 10px 0 20px 0;"><br>
 
-        <button onclick="testCalendar()">Esegui Test di Connessione</button>
+    <div class="card">
+        <h2>Configurazione Endpoint</h2>
+        <label for="apiUrl">URL Backend (Vercel o Locale):</label>
+        <input type="text" id="apiUrl" value="https://tennis-condominio-tau.vercel.app/api/admin">
+    </div>
+
+    <div class="card">
+        <h2>1. Lettura Stato (GET Prenotazioni)</h2>
+        <p>Interroga Google Calendar per visualizzare tutte le prenotazioni attive[cite: 2].</p>
+        <button onclick="eseguiGet()">Leggi Prenotazioni</button>
+    </div>
+
+    <div class="card">
+        <h2>2. Scrittura Test (POST Salva Prenotazione)</h2>
+        <p>Invia una prenotazione di test per verificare la scrittura sul calendario[cite: 2].</p>
+        <div class="flex">
+            <div>
+                <label for="testData">Data (YYYY-MM-DD):</label>
+                <input type="date" id="testData" value="2026-09-22">
+            </div>
+            <div>
+                <label for="testOra">Ora Inizio:</label>
+                <select id="testOra">
+                    <option value="08:00">08:00</option>
+                    <option value="11:00" selected>11:00</option>
+                    <option value="15:00">15:00</option>
+                    <option value="18:00">18:00</option>
+                </select>
+            </div>
+        </div>
+        <label for="testUtenti">Utenti (separati da virgola o &):</label>
+        <input type="text" id="testUtenti" value="Elia, Rossi">
         
-        <h3>Risultato:</h3>
-        <div id="output" class="loading">Clicca sul pulsante per avviare il test...</div>
+        <button onclick="eseguiSave()">Salva / Crea Evento</button>
+        <button class="secondary" onclick="eseguiCancella()">Cancella Slot</button>
+    </div>
+
+    <div class="card">
+        <h2>Console Log & Risposta Server</h2>
+        <pre id="output">In attesa di comandi...</pre>
     </div>
 
     <script>
-        async function testCalendar() {
-            const url = document.getElementById('apiUrl').value;
-            const outputDiv = document.getElementById('output');
-            outputDiv.className = 'loading';
-            outputDiv.innerText = 'Connessione in corso al backend e a Google Calendar...';
+        function log(data, isError = false) {
+            const output = document.getElementById('output');
+            output.style.color = isError ? '#f14c4c' : '#4ec9b0';
+            if (typeof data === 'object') {
+                output.innerText = JSON.stringify(data, null, 2);
+            } else {
+                output.innerText = data;
+            }
+        }
 
+        async function eseguiGet() {
+            const url = document.getElementById('apiUrl').value;
+            log('Invio richiesta per leggere le prenotazioni...');
             try {
-                const response = await fetch(url, {
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'get-prenotazioni' })
                 });
+                const data = await res.json();
+                if (!res.ok) throw new Error(JSON.stringify(data));
+                log(data);
+            } catch (err) {
+                log('ERRORE:\n' + err.message, true);
+            }
+        }
 
-                const data = await response.json();
+        async function eseguiSave() {
+            const url = document.getElementById('apiUrl').value;
+            const dataStr = document.getElementById('testData').value;
+            const oraStr = document.getElementById('testOra').value;
+            const utentiStr = document.getElementById('testUtenti').value;
 
-                if (!response.ok) {
-                    throw new Error(JSON.stringify(data, null, 2));
-                }
+            const chiave = `${dataStr}_${oraStr}`;
+            const utenti = utentiStr.split(/[,&]/).map(s => s.trim()).filter(Boolean);
 
-                outputDiv.className = '';
-                outputDiv.innerHTML = `<pre style="color: #4ec9b0;">SUCCESSO! Connessione stabilita con Google Calendar.\n\nDati ricevuti:\n${JSON.stringify(data, null, 2)}</pre>`;
-            } catch (error) {
-                outputDiv.className = '';
-                outputDiv.innerHTML = `<pre style="color: #f14c4c;">ERRORE DI CONNESSIONE:\n${error.message}</pre>`;
+            log(`Invio salvataggio per slot [${chiave}] con utenti: ${utenti.join(', ')}...`);
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'save-prenotazione',
+                        chiave: chiave,
+                        utenti: utenti,
+                        cognome: 'TesterDebug'
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(JSON.stringify(data));
+                log({ messaggio: "Salvataggio completato con successo!", rispostaServer: data });
+            } catch (err) {
+                log('ERRORE SALVATAGGIO:\n' + err.message, true);
+            }
+        }
+
+        async function eseguiCancella() {
+            const url = document.getElementById('apiUrl').value;
+            const dataStr = document.getElementById('testData'].value;
+            const oraStr = document.getElementById('testOra').value;
+
+            const chiave = `${dataStr}_${oraStr}`;
+
+            log(`Cancellazione slot [${chiave}] in corso...`);
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'save-prenotazione',
+                        chiave: chiave,
+                        utenti: [],
+                        cognome: 'TesterDebug'
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(JSON.stringify(data));
+                log({ messaggio: "Slot cancellato con successo!", rispostaServer: data });
+            } catch (err) {
+                log('ERRORE CANCELLAZIONE:\n' + err.message, true);
             }
         }
     </script>
