@@ -142,14 +142,13 @@
 
   <!-- Container Principale -->
   <div class="container">
-    <!-- Pannello Admin (Console di Amministrazione Completa) -->
+    <!-- Pannello Admin -->
     <div id="admin-gestion-panel" style="display: none; background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
       <h3 style="margin-top: 0; color: #2b6cb0;">⚙️ Console di Amministrazione</h3>
       <p style="font-size: 13px; color: #666;">Gestisci gli utenti registrati, i PIN di accesso e monitora l'anagrafica del condominio.</p>
       
       <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
-      <!-- Sezione Aggiungi Utente -->
       <h4 style="margin-bottom: 10px;">Aggiungi Nuovo Utente</h4>
       <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
         <div style="flex: 1; min-width: 200px;">
@@ -171,7 +170,6 @@
         Caricamento utenti...
       </div>
 
-      <!-- Registro Attività (Audit Log) -->
       <h4 style="margin-top: 30px; margin-bottom: 10px;">📋 Registro Attività e Modifiche (Audit Log)</h4>
       <button class="btn-blue" onclick="caricaLogAdmin()" style="margin-bottom: 10px; font-size: 11px;">Aggiorna Log</button>
       <div id="admin-logs-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px; background: #fafafa; font-size: 12px; font-family: monospace;">
@@ -192,29 +190,29 @@
 
     window.addEventListener('DOMContentLoaded', async () => {
       await scaricaListaUtentiPerAutocheck();
+      await caricaPrenotazioniLocali();
 
       const savedUser = localStorage.getItem('tennis_user');
       const savedPin = localStorage.getItem('tennis_pin');
 
       if (savedUser && savedPin) {
-        await validaEImpostaSessione(savedUser, savedPin);
+        validaEImpostaSessione(savedUser, savedPin);
       } else {
         mostraModaleLogin();
       }
     });
 
-    async function caricaPrenotazioniGoogle() {
+    async function caricaPrenotazioniLocali() {
       try {
-        const response = await fetch('/api/admin', {
+        const res = await fetch('/api/admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminPin: currentUser ? currentUser.pin : '0000', action: 'get-prenotazioni' })
+          body: JSON.stringify({ action: 'get-prenotazioni' })
         });
-        const data = await response.json();
-        if (response.ok && data) {
+        const data = await res.json();
+        if (res.ok && data) {
           prenotazioniGlobali = data;
         } else {
-          console.error('Errore risposta prenotazioni:', data);
           prenotazioniGlobali = {};
         }
       } catch (e) {
@@ -223,26 +221,20 @@
       }
     }
 
-    async function salvaPrenotazioneGoogle(chiaveSlot, utentiArray) {
+    async function salvaPrenotazioniLocali(chiaveSlot, utentiSlot) {
       try {
-        const response = await fetch('/api/admin', {
+        await fetch('/api/admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            adminPin: currentUser.pin,
             action: 'save-prenotazione',
+            cognome: currentUser ? currentUser.cognome : 'Admin',
             chiave: chiaveSlot,
-            utenti: utentiArray,
-            cognome: currentUser.cognome
+            utenti: utentiSlot
           })
         });
-        const data = await response.json();
-        if (!response.ok) {
-          alert(data.error || 'Errore durante il salvataggio su Google Calendar');
-        }
       } catch (e) {
-        console.error('Errore salvataggio Google Calendar:', e);
-        alert('Errore di connessione durante la sincronizzazione con Google Calendar.');
+        console.error('Errore salvataggio prenotazione su Google Calendar:', e);
       }
     }
 
@@ -660,7 +652,7 @@
     }
 
     async function caricaTabellone() {
-      await caricaPrenotazioniGoogle();
+      await caricaPrenotazioniLocali();
 
       const container = document.getElementById('tabellone-container') || document.querySelector('.container');
       if (!container) return;
@@ -689,7 +681,6 @@
         }
 
         let html = `
-          <!-- Didascalia informativa come da PDF -->
           <div style="background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 12px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; line-height: 1.4; text-transform: uppercase;">
             N.B. SI PUO' PRENOTARE AL MASSIMO FINO A DUE GIORNI SUCCESSIVI<br>
             LE PRENOTAZIONI EFFETTUATE IN ANTICIPO SARANNO CANCELLATE
@@ -771,7 +762,7 @@
     }
 
     async function gestisciSlot(dataIso, ora) {
-      await caricaPrenotazioniGoogle();
+      await caricaPrenotazioniLocali();
 
       const chiaveSlot = `${dataIso}_${ora}`;
       if (!prenotazioniGlobali[chiaveSlot]) {
@@ -793,7 +784,7 @@
           const cognomeCondomino = prompt("[ADMIN] Inserisci il cognome del condomino per cui effettuare la prenotazione:");
           if (cognomeCondomino && cognomeCondomino.trim() !== '') {
             utentiSlot.push(cognomeCondomino.trim());
-            await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot);
+            await salvaPrenotazioniLocali(chiaveSlot, utentiSlot);
             await caricaTabellone();
           }
         } else {
@@ -803,14 +794,13 @@
             const utenteDaRimuovere = prompt(`Digita esattamente il cognome dell'utente da rimuovere (${utentiSlot.join(', ')}):`);
             if (utenteDaRimuovere) {
               prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== utenteDaRimuovere.trim().toLowerCase());
-              const nuoviUtenti = prenotazioniGlobali[chiaveSlot];
-              if (nuoviUtenti.length === 0) delete prenotazioniGlobali[chiaveSlot];
-              await salvaPrenotazioneGoogle(chiaveSlot,nuoviUtenti);
+              if (prenotazioniGlobali[chiaveSlot].length === 0) delete prenotazioniGlobali[chiaveSlot];
+              await salvaPrenotazioniLocali(chiaveSlot, prenotazioniGlobali[chiaveSlot] || []);
               await caricaTabellone();
             }
           } else if (scelta === '2') {
             delete prenotazioniGlobali[chiaveSlot];
-            await salvaPrenotazioneGoogle(chiaveSlot, []);
+            await salvaPrenotazioniLocali(chiaveSlot, []);
             await caricaTabellone();
           } else if (scelta === '3') {
             if (utentiSlot.length >= 2) {
@@ -819,7 +809,7 @@
               const nuovoUtente = prompt("Inserisci il cognome del secondo condomino:");
               if (nuovoUtente && nuovoUtente.trim() !== '') {
                 utentiSlot.push(nuovoUtente.trim());
-                await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot);
+                await salvaPrenotazioniLocali(chiaveSlot, utentiSlot);
                 await caricaTabellone();
               }
             }
@@ -856,26 +846,30 @@
             }
 
             utentiSlot.push(currentUser.cognome);
-            await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot);
+            await salvaPrenotazioniLocali(chiaveSlot, utentiSlot);
             await caricaTabellone();
           } else {
-            const nuoviUtenti = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti);
+            prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
+            if (prenotazioniGlobali[chiaveSlot].length === 0) {
+              delete prenotazioniGlobali[chiaveSlot];
+            }
+            await salvaPrenotazioniLocali(chiaveSlot, prenotazioniGlobali[chiaveSlot] || []);
             await caricaTabellone();
           }
         } else {
           if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
             let rimosso = false;
-            const nuoviUtenti = utentiSlot.filter(u => {
+            prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => {
               if (!rimosso && u.toLowerCase() === currentUser.cognome.toLowerCase()) {
                 rimosso = true;
                 return false;
               }
               return true;
             });
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti);
+            if (prenotazioniGlobali[chiaveSlot].length === 0) {
+              delete prenotazioniGlobali[chiaveSlot];
+            }
+            await salvaPrenotazioniLocali(chiaveSlot, prenotazioniGlobali[chiaveSlot] || []);
             await caricaTabellone();
           }
         }
@@ -907,7 +901,7 @@
 
         if (confirm(msg)) {
           utentiSlot.push(currentUser.cognome);
-          await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot);
+          await salvaPrenotazioniLocali(chiaveSlot, utentiSlot);
           await caricaTabellone();
         }
       }

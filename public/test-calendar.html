@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Connessione Google Calendar</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { background: #0070f3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0051a2; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .loading { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Test Connessione Google Calendar</h2>
+        <p>Questo script interroga l'endpoint backend per leggere gli eventi direttamente dal Google Calendar condiviso.</p>
+        
+        <label for="apiUrl">URL Backend Vercel (o locale):</label><br>
+        <input type="text" id="apiUrl" value="https://tennis-condominio-tau.vercel.app/api/admin" style="width: 100%; padding: 8px; margin: 10px 0 20px 0;"><br>
+
+        <button onclick="testCalendar()">Esegui Test di Connessione</button>
+        
+        <h3>Risultato:</h3>
+        <div id="output" class="loading">Clicca sul pulsante per avviare il test...</div>
+    </div>
+
+    <script>
+        async function testCalendar() {
+            const url = document.getElementById('apiUrl').value;
+            const outputDiv = document.getElementById('output');
+            outputDiv.className = 'loading';
+            outputDiv.innerText = 'Connessione in corso al backend e a Google Calendar...';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'get-prenotazioni' })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(JSON.stringify(data, null, 2));
+                }
+
+                outputDiv.className = '';
+                outputDiv.innerHTML = `<pre style="color: #4ec9b0;">SUCCESSO! Connessione stabilita con Google Calendar.\n\nDati ricevuti:\n${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                outputDiv.className = '';
+                outputDiv.innerHTML = `<pre style="color: #f14c4c;">ERRORE DI CONNESSIONE:\n${error.message}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>
