@@ -118,7 +118,8 @@
     <div>
       <span id="logged-user-display" style="margin-right: 15px; font-weight: bold;"></span>
       <button id="admin-panel-btn" onclick="toggleAdminPanel()" style="display: none; margin-right: 10px; padding: 8px 12px; background: #3182ce; color: white; border: none; border-radius: 4px; cursor: pointer;">Pannello Admin</button>
-      <button id="logout-btn" class="btn-red" onclick="logoutUser()" style="display: none;">Cambia Utente</button>
+      <button id="change-pin-btn" class="btn-yellow" onclick="cambiaMioPin()" style="margin-right: 10px; display: inline-block;">Cambia PIN</button>
+      <button id="logout-btn" class="btn-red" onclick="logoutUser()" style="display: inline-block;">Cambia Utente</button>
     </div>
   </header>
 
@@ -410,6 +411,60 @@
       const adminPanel = document.getElementById('admin-gestion-panel');
       if (adminPanel) adminPanel.style.display = 'none';
       mostraModaleLogin();
+    }
+
+    async function cambiaMioPin() {
+      if (!currentUser) return;
+
+      const pinAttualeInserito = prompt("Inserisci il tuo PIN attuale:");
+      if (pinAttualeInserito === null) return;
+
+      if (pinAttualeInserito.trim() !== currentUser.pin) {
+        alert("Il PIN attuale inserito non è corretto.");
+        return;
+      }
+
+      const nuovoPin1 = prompt("Inserisci il nuovo PIN desiderato (almeno 4 caratteri o numeri):");
+      if (nuovoPin1 === null) return;
+      const pinFinale = nuovoPin1.trim();
+
+      if (!pinFinale || pinFinale.length < 3) {
+        alert("Il nuovo PIN non è valido o è troppo corto.");
+        return;
+      }
+
+      const nuovoPin2 = prompt("Conferma il nuovo PIN:");
+      if (nuovoPin2 === null) return;
+
+      if (pinFinale !== nuovoPin2.trim()) {
+        alert("I PIN inseriti non coincidono.");
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminPin: currentUser.pin,
+            action: 'reset-pin',
+            cognome: currentUser.cognome,
+            newPin: pinFinale
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          currentUser.pin = pinFinale;
+          localStorage.setItem('tennis_pin', pinFinale);
+          alert("PIN modificato con successo! Ricordati il nuovo PIN per i prossimi accessi.");
+        } else {
+          alert(data.error || "Errore durante la modifica del PIN.");
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Errore di connessione al server.");
+      }
     }
 
     function toggleAdminPanel() {
@@ -710,11 +765,6 @@
         }
 
         let html = `
-          <div style="background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 12px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; line-height: 1.4; text-transform: uppercase;">
-            N.B. SI PUO' PRENOTARE AL MASSIMO FINO A DUE GIORNI SUCCESSIVI<br>
-            LE PRENOTAZIONI EFFETTUATE IN ANTICIPO SARANNO CANCELLATE
-          </div>
-
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <h3>Intercondominio Salario Alto - Tabellone Orari - Campo da Tennis Via Suvereto 247</h3>
             <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b> ${currentUser.isAdmin ? '<span style="color: #2b6cb0; font-weight: bold;">[Modalità Admin: Gestione Totale]</span>' : ''}. Orario continuato dalle 08:00 alle 21:00.</p>
