@@ -29,9 +29,55 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const body = req.body || {};
-      const { adminPin, action } = body;
+      const { action } = body;
 
-      // 1. Azione di Toggle Attivo / Disattivo Account
+      // 1. Recupero Prenotazioni (Calendario)
+      if (action === 'get-prenotazioni') {
+        const calResponse = await fetch(`${supabaseUrl}/rest/v1/prenotazioni?select=*`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        });
+        const prenotazioniDB = await calResponse.json();
+        
+        const mappaPrenotazioni = {};
+        if (Array.isArray(prenotazioniDB)) {
+          prenotazioniDB.forEach(p => {
+            mappaPrenotazioni[p.chiave] = p.utenti || [];
+          });
+        }
+        return res.status(200).json(mappaPrenotazioni);
+      }
+
+      // 2. Salvataggio / Modifica Prenotazione
+      if (action === 'save-prenotazione') {
+        const { chiave, utenti } = body;
+        if (!chiave) return res.status(400).json({ error: 'Chiave slot mancante' });
+
+        const upsertRes = await fetch(`${supabaseUrl}/rest/v1/prenotazioni`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=minimal'
+          },
+          body: JSON.stringify({
+            chiave: chiave,
+            utenti: utenti || [],
+            updated_at: new Date().toISOString()
+          })
+        });
+
+        if (!upsertRes.ok) {
+          throw new Error('Errore salvataggio prenotazione su database');
+        }
+
+        return res.status(200).json({ success: true });
+      }
+
+      // 3. Azione di Toggle Attivo / Disattivo Account
       if (action === 'toggle-attivo') {
         const { cognome, attivo } = body;
         if (!cognome) return res.status(400).json({ error: 'Cognome mancante' });
@@ -55,7 +101,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: `Stato attivo aggiornato per ${cognome}` });
       }
 
-      // 2. Controllo accesso o recupero utenti protetto da PIN admin
+      // 4. Controllo accesso o recupero utenti protetto da PIN admin (Gestione Master Admin '0000' inclusa)
       if (action === 'get-users') {
         const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*`, {
           headers: {
@@ -65,7 +111,7 @@ export default async function handler(req, res) {
         });
         const users = await response.json();
         
-        // Verifica se l'adminPin corrisponde a un admin o al master '0000'
+        const { adminPin } = body;
         const isMaster = (adminPin === '0000');
         const adminFound = users.find(u => u.pin === adminPin && u.is_admin === true);
 
@@ -76,7 +122,7 @@ export default async function handler(req, res) {
         return res.status(200).json(users);
       }
 
-      // 3. Aggiunta nuovo utente
+      // 5. Aggiunta nuovo utente
       if (action === 'add') {
         const { cognome, newPin } = body;
         if (!cognome) return res.status(400).json({ error: 'Cognome obbligatorio' });
@@ -109,7 +155,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, pin: pinDaUsare });
       }
 
-      // 4. Eliminazione utente
+      // 6. Eliminazione utente
       if (action === 'delete') {
         const { cognome } = body;
         if (!cognome || cognome.toLowerCase() === 'admin') {
@@ -128,7 +174,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
       }
 
-      // 5. Reset PIN o Modifica PIN
+      // 7. Reset PIN o Modifica PIN
       if (action === 'reset-pin') {
         const { cognome, newPin } = body;
         if (!cognome || !newPin) return res.status(400).json({ error: 'Dati incompleti' });
@@ -148,7 +194,11 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
       }
 
-      // Altre azioni gestite (es. prenotazioni / log se presenti nel tuo progetto)
+      // 8. Log di audit
+      if (action === 'get-logs') {
+        return res.status(200).json([]);
+      }
+
       return res.status(400).json({ error: 'Azione non riconosciuta' });
     }
 
