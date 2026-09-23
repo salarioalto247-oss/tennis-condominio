@@ -10,6 +10,14 @@ export default async function handler(req, res) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
+  // Credenziali Google Calendar (se configurate nelle variabili d'ambiente)
+  const calendarId = process.env.GOOGLE_CALENDAR_ID;
+  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+  if (privateKey) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+  }
+
   if (!supabaseUrl || !supabaseKey) {
     return res.status(500).json({ error: 'Variabili d ambiente Supabase non configurate' });
   }
@@ -31,47 +39,128 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const { action } = body;
 
-      // 1. Recupero Prenotazioni (Calendario)
+      // 1. Recupero Prenotazioni da Google Calendar
       if (action === 'get-prenotazioni') {
-        const calResponse = await fetch(`${supabaseUrl}/rest/v1/prenotazioni?select=*`, {
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-          }
-        });
-        const prenotazioniDB = await calResponse.json();
-        
-        const mappaPrenotazioni = {};
-        if (Array.isArray(prenotazioniDB)) {
-          prenotazioniDB.forEach(p => {
-            mappaPrenotazioni[p.chiave] = p.utenti || [];
-          });
+        if (!calendarId || !clientEmail || !privateKey) {
+          // Fallback se Calendar non è configurato
+          return res.status(200).json({});
         }
-        return res.status(200).json(mappaPrenotazioni);
+
+        try {
+          const jwtToken = await getGoogleJWT(clientEmail, privateKey);
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const timeMin = now.toISOString();
+          
+          const calRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&singleEvents=true&maxResults=250`, {
+            headers: { 'Authorization': `Bearer ${jwtToken}` }
+          });
+          const calData = await calRes.json();
+          
+          const mappaPrenotazioni = {};
+          if (calData && calData.items) {
+            calData.items.forEach(item => {
+              const summary = item.summary || '';
+              const description = item.description || '';
+              const startIso = item.start.dateTime || item.start.date;
+              
+              if (startIso) {
+                const datePart = startIso.split('T')[0];
+                const timePart = startIso.split('T')[1] ? startIso.split('T')[1].substring(0, 5) : '08:00';
+                const chiave = `${datePart}_${timePart}`;
+                
+                let utentiArray = [];
+                if (description) {
+                  utentiArray = description.split(',').map(u => u.trim()).filter(Boolean);
+                } else if (summary.includes(':')) {
+                  const parts = summary.split(':');
+                  if (parts[1]) utentiArray = parts[1].split('&').map(u => u.trim()).filter(Boolean);
+                }
+                
+                if (utentiArray.length > 0) {
+                  mappaPrenotazioni[chiave] = utentiArray;
+                }
+              }
+            });
+          }
+          return res.status(200).json(mappaPrenotazioni);
+        } catch (calErr) {
+          console.error('Errore lettura Google Calendar:', calErr);
+          return res.status(200).json({});
+        }
       }
 
-      // 2. Salvataggio / Modifica Prenotazione
+      // 2. Salvataggio / Modifica Prenotazione su Google Calendar
       if (action === 'save-prenotazione') {
-        const { chiave, utenti } = body;
+        const { chiave, utenti, tipoAzione, cognome } = body;
         if (!chiave) return res.status(400).json({ error: 'Chiave slot mancante' });
 
-        const upsertRes = await fetch(`${supabaseUrl}/rest/v1/prenotazioni`, {
-          method: 'POST',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates,return=minimal'
-          },
-          body: JSON.stringify({
-            chiave: chiave,
-            utenti: utenti || [],
-            updated_at: new Date().toISOString()
-          })
-        });
+        if (!calendarId || !clientEmail || !privateKey) {
+          return res.status(500).json({ error: 'Google Calendar non configurato' });
+        }
 
-        if (!upsertRes.ok) {
-          throw new Error('Errore salvataggio prenotazione su database');
+        const [dateIso, oraInizio] = chiave.split('_');
+        const [ore] = oraInizio.split(':');
+        const oraFineNum = parseInt(ore) + 1;
+        const oraFine = (oraFineNum < 10 ? `0${oraFineNum}` : `${oraFineNum}`) + ':00';
+
+        const startDateTime = `${dateIso}T${oraInizio}:00Z`;
+        const endDateTime = `${dateIso}T${oraFine}:00Z`;
+        const jwtToken = await getGoogleJWT(clientEmail, privateKey);
+
+        // Cerca se esiste già un evento in questo slot
+        const searchRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${dateIso}T00:00:00Z&timeMax=${dateIso}T23:59:59Z&singleEvents=true`, {
+          headers: { 'Authorization': `Bearer ${jwtToken}` }
+        });
+        const searchData = await searchRes.json();
+        
+        let existingEventId = null;
+        if (searchData && searchData.items) {
+          const found = searchData.items.find(ev => {
+            const evStart = ev.start.dateTime || ev.start.date;
+            return evStart && evStart.includes(`${dateIso}T${oraInizio}`);
+          });
+          if (found) existingEventId = found.id;
+        }
+
+        if (!utenti || utenti.length === 0) {
+          // Cancella evento se lo slot è vuoto
+          if (existingEventId) {
+            await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${existingEventId}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${jwtToken}` }
+            });
+          }
+        } else {
+          // Crea o aggiorna evento
+          const eventSummary = `Tennis: ${utenti.join(' & ')}`;
+          const eventDescription = utenti.join(', ');
+          const eventBody = {
+            summary: eventSummary,
+            description: eventDescription,
+            start: { dateTime: startDateTime },
+            end: { dateTime: endDateTime }
+          };
+
+          if (existingEventId) {
+            await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${existingEventId}`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${jwtToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(eventBody)
+            });
+          } else {
+            await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${jwtToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(eventBody)
+            });
+          }
         }
 
         return res.status(200).json({ success: true });
@@ -101,7 +190,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: `Stato attivo aggiornato per ${cognome}` });
       }
 
-      // 4. Controllo accesso o recupero utenti protetto da PIN admin (Gestione Master Admin '0000' inclusa)
+      // 4. Controllo accesso o recupero utenti protetto da PIN admin
       if (action === 'get-users') {
         const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*`, {
           headers: {
@@ -208,4 +297,35 @@ export default async function handler(req, res) {
     console.error('Errore API Admin:', err);
     return res.status(500).json({ error: err.message || 'Errore interno server' });
   }
+}
+
+// Funzione di supporto JWT per Google Calendar API
+async function getGoogleJWT(clientEmail, privateKey) {
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: clientEmail,
+    scope: 'https://www.googleapis.com/auth/calendar',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now
+  };
+
+  const base64UrlEncode = (str) => Buffer.from(str).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
+
+  const crypto = await import('crypto');
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(unsignedToken);
+  const signature = sign.sign(privateKey, 'base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  const jwt = `${unsignedToken}.${signature}`;
+
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=authorization_assertion&assertion=${jwt}`
+  });
+  const tokenData = await tokenRes.json();
+  return tokenData.access_token;
 }
