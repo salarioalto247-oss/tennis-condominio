@@ -51,11 +51,11 @@
         </section>
     </div>
 
-    <!-- Schermata di Login con verifica sulla Tabella Utenti -->
+    <!-- Schermata di Login che sfrutta l'API /api/admin esistente -->
     <div id="login-container" class="max-w-md mx-auto mt-24 bg-white shadow-md rounded-lg p-8 text-center border border-gray-100">
         <div class="text-blue-600 text-4xl mb-3">🔒</div>
         <h2 class="text-xl font-bold text-gray-800 mb-2">Accesso Amministratore</h2>
-        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN associato al tuo utente amministratore.</p>
+        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN di amministrazione.</p>
         
         <form onsubmit="gestisciLogin(event)" class="space-y-4">
             <input type="password" id="admin-pin" placeholder="Inserisci PIN" required
@@ -63,7 +63,7 @@
             <button type="submit" id="btn-accedi" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
                 Accedi
             </button>
-            <p id="login-error" class="text-red-500 text-xs hidden">PIN non valido o utente non autorizzato.</p>
+            <p id="login-error" class="text-red-500 text-xs hidden">PIN errato o non autorizzato.</p>
         </form>
         
         <div class="mt-6 border-t pt-4">
@@ -71,7 +71,7 @@
         </div>
     </div>
 
-    <!-- Logica di autenticazione basata sulla tabella utenti -->
+    <!-- Logica di autenticazione integrata con /api/admin -->
     <script>
         function checkAccess() {
             const isAdmin = localStorage.getItem('isAdmin') === 'true';
@@ -96,20 +96,24 @@
             btnAccedi.disabled = true;
 
             try {
-                // Interroga l'API o endpoint di verifica utenti (adatta il percorso se necessario, es. /api/utenti o /api/login)
-                const response = await fetch('/api/pagamenti-api?action=verify&pin=' + encodeURIComponent(pinInserito));
+                // Chiama la stessa API /api/admin che usa la home
+                const response = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: pinInserito })
+                });
+
                 const risultato = await response.json();
 
-                // Se l'API restituisce un match positivo con un utente admin
-                if (risultato.success && risultato.isAdmin) {
+                // Verifica la risposta dell'API admin (adatta la condizione se l'API restituisce success: true o authorized: true)
+                if (response.ok && (risultato.success || risultato.authorized || risultato.ok)) {
                     localStorage.setItem('isAdmin', 'true');
                     checkAccess();
                 } else {
-                    // Fallback di controllo locale o errore
                     errorElement.classList.remove('hidden');
                 }
             } catch (error) {
-                console.error("Errore di verifica PIN:", error);
+                console.error("Errore durante il login:", error);
                 errorElement.textContent = "Errore di connessione al server.";
                 errorElement.classList.remove('hidden');
             } finally {
