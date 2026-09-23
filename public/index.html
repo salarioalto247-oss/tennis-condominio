@@ -233,7 +233,6 @@
         });
         const data = await response.json();
         if (response.ok && data) {
-          // Se abbiamo già uno storico precedente, controlla se qualcuno si è unito ai nostri slot
           if (currentUser && Object.keys(prenotazioniPrecedenti).length > 0) {
             verificaNuoviCompagni(data);
           }
@@ -256,11 +255,9 @@
         const slotNuovo = nuovePrenotazioni[chiave] || [];
         const slotVecchio = prenotazioniPrecedenti[chiave] || [];
 
-        // Controlla se noi eravamo presenti nello slot nel ciclo precedente
         const eroPresentePrima = slotVecchio.some(u => u.toLowerCase() === nomeMio);
         
         if (eroPresentePrima) {
-          // Se il numero di utenti è aumentato, significa che qualcuno si è aggiunto
           if (slotNuovo.length > slotVecchio.length) {
             const nuoviUtenti = slotNuovo.filter(u => !slotVecchio.some(v => v.toLowerCase() === u.toLowerCase()));
             if (nuoviUtenti.length > 0) {
@@ -272,7 +269,7 @@
       }
     }
 
-    async function salvaPrenotazioneGoogle(chiaveSlot, utentiArray) {
+    async function salvaPrenotazioneGoogle(chiaveSlot, utentiArray, tipoAzioneCustom = null) {
       try {
         const response = await fetch('/api/admin', {
           method: 'POST',
@@ -282,7 +279,8 @@
             action: 'save-prenotazione',
             chiave: chiaveSlot,
             utenti: utentiArray,
-            cognome: currentUser ? currentUser.cognome : 'Admin'
+            cognome: currentUser ? currentUser.cognome : 'Admin',
+            tipoAzione: tipoAzioneCustom
           })
         });
         const data = await response.json();
@@ -899,7 +897,7 @@
           const cognomeCondomino = prompt("[ADMIN] Inserisci il cognome del condomino per cui effettuare la prenotazione:");
           if (cognomeCondomino && cognomeCondomino.trim() !== '') {
             utentiSlot.push(cognomeCondomino.trim());
-            await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot);
+            await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'ADMIN_PRENOTAZIONE');
             await caricaTabellone();
           }
         } else {
@@ -911,12 +909,12 @@
               prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== utenteDaRimuovere.trim().toLowerCase());
               const nuoviUtenti = prenotazioniGlobali[chiaveSlot];
               if (nuoviUtenti.length === 0) delete prenotazioniGlobali[chiaveSlot];
-              await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti);
+              await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'ADMIN_RIMOZIONE_UTENTE');
               await caricaTabellone();
             }
           } else if (scelta === '2') {
             delete prenotazioniGlobali[chiaveSlot];
-            await salvaPrenotazioneGoogle(chiaveSlot, []);
+            await salvaPrenotazioneGoogle(chiaveSlot, [], 'ADMIN_LIBERA_SLOT');
             await caricaTabellone();
           } else if (scelta === '3') {
             if (utentiSlot.length >= 2) {
@@ -925,7 +923,7 @@
               const nuovoUtente = prompt("Inserisci il secondo condomino:");
               if (nuovoUtente && nuovoUtente.trim() !== '') {
                 utentiSlot.push(nuovoUtente.trim());
-                await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot);
+                await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'ADMIN_AGGIUNGI_DOPPIO');
                 await caricaTabellone();
               }
             }
@@ -962,26 +960,26 @@
             }
 
             utentiSlot.push(currentUser.cognome);
-            await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot);
+            await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'UNIONE_DOPPIO');
             await caricaTabellone();
           } else {
             const nuoviUtenti = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-            prenotazioniGlobali[chiaveSlot] = novosUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, novosUtenti);
+            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
+            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
             await caricaTabellone();
           }
         } else {
           if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
             let rimosso = false;
-            const novosUtenti = utentiSlot.filter(u => {
+            const nuoviUtenti = utentiSlot.filter(u => {
               if (!rimosso && u.toLowerCase() === currentUser.cognome.toLowerCase()) {
                 rimosso = true;
                 return false;
               }
               return true;
             });
-            prenotazioniGlobali[chiaveSlot] = novosUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, novosUtenti);
+            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
+            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
             await caricaTabellone();
           }
         }
@@ -1001,8 +999,9 @@
           : `Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`;
 
         if (confirm(msg)) {
+          const tipoAzioneLog = utentiSlot.length === 1 ? 'UNIONE_DOPPIO' : 'NUOVA_PRENOTAZIONE';
           utentiSlot.push(currentUser.cognome);
-          await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot);
+          await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, tipoAzioneLog);
           await caricaTabellone();
         }
       }
