@@ -9,7 +9,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen p-6">
 
-    <!-- Area protetta (Visibile solo se loggati con il PIN corretto) -->
+    <!-- Area protetta (Visibile solo se loggati correttamente) -->
     <div id="admin-container" class="max-w-5xl mx-auto bg-white shadow-md rounded-lg p-6 hidden">
         <header class="flex justify-between items-center border-b pb-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800">💳 Gestione Pagamenti Tennis</h1>
@@ -51,19 +51,19 @@
         </section>
     </div>
 
-    <!-- Schermata di Login con PIN Integrata -->
+    <!-- Schermata di Login con verifica sulla Tabella Utenti -->
     <div id="login-container" class="max-w-md mx-auto mt-24 bg-white shadow-md rounded-lg p-8 text-center border border-gray-100">
         <div class="text-blue-600 text-4xl mb-3">🔒</div>
         <h2 class="text-xl font-bold text-gray-800 mb-2">Accesso Amministratore</h2>
-        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN di amministrazione per accedere alla gestione dei pagamenti.</p>
+        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN associato al tuo utente amministratore.</p>
         
         <form onsubmit="gestisciLogin(event)" class="space-y-4">
             <input type="password" id="admin-pin" placeholder="Inserisci PIN" required
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-center tracking-widest text-lg">
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
+            <button type="submit" id="btn-accedi" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
                 Accedi
             </button>
-            <p id="login-error" class="text-red-500 text-xs hidden">PIN errato. Riprova.</p>
+            <p id="login-error" class="text-red-500 text-xs hidden">PIN non valido o utente non autorizzato.</p>
         </form>
         
         <div class="mt-6 border-t pt-4">
@@ -71,11 +71,8 @@
         </div>
     </div>
 
-    <!-- Logica di autenticazione e gestione -->
+    <!-- Logica di autenticazione basata sulla tabella utenti -->
     <script>
-        // Sostituisci "1234" con il PIN reale utilizzato nel vostro sistema/index.html
-        const PIN_CORRETTO = "1234";
-
         function checkAccess() {
             const isAdmin = localStorage.getItem('isAdmin') === 'true';
             if (isAdmin) {
@@ -88,16 +85,36 @@
             }
         }
 
-        function gestisciLogin(event) {
+        async function gestisciLogin(event) {
             event.preventDefault();
-            const pinInserito = document.getElementById('admin-pin').value;
-            
-            if (pinInserito === PIN_CORRETTO) {
-                localStorage.setItem('isAdmin', 'true');
-                document.getElementById('login-error').classList.add('hidden');
-                checkAccess();
-            } else {
-                document.getElementById('login-error').classList.remove('hidden');
+            const pinInserito = document.getElementById('admin-pin').value.trim();
+            const errorElement = document.getElementById('login-error');
+            const btnAccedi = document.getElementById('btn-accedi');
+
+            errorElement.classList.add('hidden');
+            btnAccedi.textContent = 'Verifica in corso...';
+            btnAccedi.disabled = true;
+
+            try {
+                // Interroga l'API o endpoint di verifica utenti (adatta il percorso se necessario, es. /api/utenti o /api/login)
+                const response = await fetch('/api/pagamenti-api?action=verify&pin=' + encodeURIComponent(pinInserito));
+                const risultato = await response.json();
+
+                // Se l'API restituisce un match positivo con un utente admin
+                if (risultato.success && risultato.isAdmin) {
+                    localStorage.setItem('isAdmin', 'true');
+                    checkAccess();
+                } else {
+                    // Fallback di controllo locale o errore
+                    errorElement.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error("Errore di verifica PIN:", error);
+                errorElement.textContent = "Errore di connessione al server.";
+                errorElement.classList.remove('hidden');
+            } finally {
+                btnAccedi.textContent = 'Accedi';
+                btnAccedi.disabled = false;
             }
         }
 
