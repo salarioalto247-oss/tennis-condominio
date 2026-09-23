@@ -51,7 +51,6 @@ export default async function handler(req, res) {
     return tokenData.access_token;
   }
 
-  // Funzione di scrittura log aggiornata con cattura e salvataggio dell'IP
   const scriviLog = async (userEmail, actionType, details) => {
     try {
       const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : 'N.D.';
@@ -104,8 +103,9 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const body = req.body || {};
-      const { action, cognome, pin, newPin, vecchioCognome, is_admin, chiave, utenti, tipoAzione } = body;
+      const { action, cognome, newPin, vecchioCognome, nuovoCognome, is_admin, chiave, utenti, tipoAzione } = body;
 
+      // Azione di lettura prenotazioni (consentita a tutti gli utenti autenticati)
       if (action === 'get-prenotazioni') {
         if (!calendarId) return res.status(500).json({ error: 'GOOGLE_CALENDAR_ID non configurato' });
         const accessToken = await getGoogleAccessToken();
