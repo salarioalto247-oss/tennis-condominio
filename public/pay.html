@@ -9,7 +9,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen p-6">
 
-    <!-- Area protetta (Visibile solo se loggati come Admin) -->
+    <!-- Area protetta (Visibile solo se loggati con il PIN corretto) -->
     <div id="admin-container" class="max-w-5xl mx-auto bg-white shadow-md rounded-lg p-6 hidden">
         <header class="flex justify-between items-center border-b pb-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800">💳 Gestione Pagamenti Tennis</h1>
@@ -51,19 +51,19 @@
         </section>
     </div>
 
-    <!-- Schermata di Login Integrata -->
+    <!-- Schermata di Login con PIN Integrata -->
     <div id="login-container" class="max-w-md mx-auto mt-24 bg-white shadow-md rounded-lg p-8 text-center border border-gray-100">
         <div class="text-blue-600 text-4xl mb-3">🔒</div>
         <h2 class="text-xl font-bold text-gray-800 mb-2">Accesso Amministratore</h2>
-        <p class="text-gray-600 text-sm mb-6">Inserisci la password di amministrazione per accedere alla gestione dei pagamenti.</p>
+        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN di amministrazione per accedere alla gestione dei pagamenti.</p>
         
         <form onsubmit="gestisciLogin(event)" class="space-y-4">
-            <input type="password" id="admin-password" placeholder="Password Admin" required
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+            <input type="password" id="admin-pin" placeholder="Inserisci PIN" required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-center tracking-widest text-lg">
             <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
                 Accedi
             </button>
-            <p id="login-error" class="text-red-500 text-xs hidden">Password errata. Riprova.</p>
+            <p id="login-error" class="text-red-500 text-xs hidden">PIN errato. Riprova.</p>
         </form>
         
         <div class="mt-6 border-t pt-4">
@@ -73,7 +73,9 @@
 
     <!-- Logica di autenticazione e gestione -->
     <script>
-        // Controlla lo stato all'avvio
+        // Sostituisci "1234" con il PIN reale utilizzato nel vostro sistema/index.html
+        const PIN_CORRETTO = "1234";
+
         function checkAccess() {
             const isAdmin = localStorage.getItem('isAdmin') === 'true';
             if (isAdmin) {
@@ -86,14 +88,11 @@
             }
         }
 
-        // Funzione di login locale (puoi personalizzare la password o integrarla con il backend)
         function gestisciLogin(event) {
             event.preventDefault();
-            const passwordInput = document.getElementById('admin-password').value;
+            const pinInserito = document.getElementById('admin-pin').value;
             
-            // NOTA: Sostituisci "tuapasswordadmin" con la password reale che usate nel sistema
-            // Oppure adatta il controllo alla logica del vostro index.html
-            if (passwordInput === "admin123" || passwordInput === "tennis2026") {
+            if (pinInserito === PIN_CORRETTO) {
                 localStorage.setItem('isAdmin', 'true');
                 document.getElementById('login-error').classList.add('hidden');
                 checkAccess();
@@ -136,7 +135,7 @@
             }
         }
 
-        // Avvio controllo
+        // Avvio controllo all'apertura
         checkAccess();
     </script>
 </body>
