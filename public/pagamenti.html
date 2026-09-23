@@ -103,7 +103,7 @@
   <div class="container">
     <div style="background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
       <h3 style="margin-top: 0; color: #2b6cb0;">Console di Amministrazione Quote</h3>
-      <p style="font-size: 13px; color: #666;">Aggiungi nuovi utenti, gestisci i PIN e clicca sullo stato della quota per aggiornarlo in tempo reale.</p>
+      <p style="font-size: 13px; color: #666;">Aggiungi nuovi utenti, gestisci i PIN e clicca sullo stato della quota o sull'account per aggiornarli in tempo reale.</p>
       
       <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
@@ -158,7 +158,6 @@
         return;
       }
 
-      // Verifica permessi admin
       try {
         const res = await fetch('/api/admin', {
           method: 'POST',
@@ -195,11 +194,12 @@
         const users = await res.json();
         if (res.ok && Array.isArray(users)) {
           let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
-          html += '<tr style="background: #f4f4f4; text-align: left;"><th style="padding: 6px; border: 1px solid #ddd;">Cognome</th><th style="padding: 6px; border: 1px solid #ddd;">PIN</th><th style="padding: 6px; border: 1px solid #ddd;">Quota pagata anno in corso</th><th style="padding: 6px; border: 1px solid #ddd;">Anno Quota</th><th style="padding: 6px; border: 1px solid #ddd;">Data Pagamento</th><th style="padding: 6px; border: 1px solid #ddd; text-align: center;">Azioni</th></tr>';
+          html += '<tr style="background: #f4f4f4; text-align: left;"><th style="padding: 6px; border: 1px solid #ddd;">Cognome</th><th style="padding: 6px; border: 1px solid #ddd;">PIN</th><th style="padding: 6px; border: 1px solid #ddd;">Stato Account</th><th style="padding: 6px; border: 1px solid #ddd;">Quota pagata anno in corso</th><th style="padding: 6px; border: 1px solid #ddd;">Anno Quota</th><th style="padding: 6px; border: 1px solid #ddd;">Data Pagamento</th><th style="padding: 6px; border: 1px solid #ddd; text-align: center;">Azioni</th></tr>';
           
           users.forEach(u => {
             const isMasterAdmin = u.cognome.toLowerCase() === 'admin';
             const quotaStatus = u.quota_pagata === true || u.quota_pagata === 'true';
+            const isAttivo = u.attivo !== false && u.attivo !== 'false';
 
             html += `
               <tr>
@@ -210,6 +210,13 @@
                 <td style="padding: 6px; border: 1px solid #ddd;">
                   ${u.pin}
                   ${!isMasterAdmin ? `<div style="margin-top: 4px;"><button class="btn-blue" onclick="modificaPinAdmin('${u.cognome}', '${u.pin}')" style="font-size: 10px; padding: 2px 5px;">Modifica PIN</button></div>` : ''}
+                </td>
+                <td style="padding: 6px; border: 1px solid #ddd;">
+                  ${!isMasterAdmin ? `
+                    <span class="${isAttivo ? 'badge-pagato' : 'badge-non-pagato'}" onclick="toggleStatoAttivoAdmin('${u.cognome}',${isAttivo})" title="Clicca per attivare/disattivare">
+                      ${isAttivo ? 'Attivo' : 'Non attivo'}
+                    </span>
+                  ` : '<span style="color: green; font-weight: bold;">Sempre attivo</span>'}
                 </td>
                 <td style="padding: 6px; border: 1px solid #ddd;">
                   <span class="${quotaStatus ? 'badge-pagato' : 'badge-non-pagato'}" onclick="toggleStatoPagamentoAdmin('${u.cognome}', ${quotaStatus})" title="Clicca per invertire stato">
@@ -230,6 +237,31 @@
         }
       } catch (e) {
         console.error('Errore lista utenti admin', e);
+      }
+    }
+
+    async function toggleStatoAttivoAdmin(cognome, statoAttuale) {
+      const nuovoStato = !statoAttuale;
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminPin: currentAdmin.pin,
+            action: 'toggle-attivo',
+            cognome: cognome,
+            attivo: nuovoStato
+          })
+        });
+
+        if (res.ok) {
+          caricaListaUtentiAdmin();
+        } else {
+          alert("Errore durante l'aggiornamento dello stato utente.");
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Errore di connessione.");
       }
     }
 

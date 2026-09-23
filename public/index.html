@@ -134,7 +134,7 @@
   </div>
 
   <footer style="text-align: center; padding: 15px; color: #666; font-size: 12px; border-top: 1px solid #eee; background: #fff; margin-top: 40px;">
-    Intercondominio Salario Alto - Versione App: <b>1.5.0</b>
+    Intercondominio Salario Alto - Versione App: <b>1.5.1</b>
   </footer>
 
   <script>
@@ -331,6 +331,13 @@
           const isMaster = (cognome.toLowerCase() === 'admin' && pin === '0000');
 
           if (userFound || isMaster) {
+            // Controllo se l'utente è attivo
+            if (userFound && (userFound.attivo === false || userFound.attivo === 'false')) {
+              if (mostraErroriUI && errorEl) errorEl.textContent = 'Account disattivato o non in regola. Contatta l\'amministratore.';
+              else logoutUser();
+              return;
+            }
+
             currentUser = userFound 
               ? { ...userFound, isAdmin: userFound.is_admin } 
               : { cognome: 'Admin', pin: '0000', isAdmin: true, is_admin: true };
@@ -577,8 +584,8 @@
             await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'UNIONE_DOPPIO');
             await caricaTabellone();
           } else {
-            const nuovi = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-            await salvaPrenotazioneGoogle(chiaveSlot, nuovi, 'CANCELLAZIONE');
+            const novos = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
+            await salvaPrenotazioneGoogle(chiaveSlot, novos, 'CANCELLAZIONE');
             await caricaTabellone();
           }
         } else {
