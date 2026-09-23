@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E🎾%3C/text%3E%3C/svg%3E">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Intercondominio Salario Alto - Prenotazione Campo Tennis</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E🎾%3C/text%3E%3C/svg%3E">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -27,7 +27,6 @@
       padding: 0 20px;
       padding-bottom: 40px;
     }
-    /* Modale Login */
     #login-modal {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -110,11 +109,30 @@
     .btn-blue:hover {
       background-color: #2b6cb0 !important;
     }
+    .badge-pagato {
+      background-color: #38a169;
+      color: white;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .badge-non-pagato {
+      background-color: #e53e3e;
+      color: white;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
 
-  <!-- Header con info utente in alto a destra -->
   <header>
     <h2 style="margin: 0;">🎾 Intercondominio Salario Alto - Prenotazione Campo Tennis</h2>
     <div>
@@ -125,7 +143,6 @@
     </div>
   </header>
 
-  <!-- Modale Pop-Up Login -->
   <div id="login-modal" style="display: none;">
     <div class="modal-content" style="position: relative;">
       <h3>Accesso Utente</h3>
@@ -143,24 +160,31 @@
     </div>
   </div>
 
-  <!-- Container Principale -->
   <div class="container">
-    <!-- Pannello Admin -->
     <div id="admin-gestion-panel" style="display: none; background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-      <h3 style="margin-top: 0; color: #2b6cb0;">⚙️ Console di Amministrazione</h3>
-      <p style="font-size: 13px; color: #666;">Gestisci gli utenti registrati, i PIN di accesso e monitora l'anagrafica del condominio.</p>
+      <h3 style="margin-top: 0; color: #2b6cb0;">⚙️ Console di Amministrazione & Quote</h3>
+      <p style="font-size: 13px; color: #666;">Gestisci gli utenti registrati, i PIN e monitora lo stato dei pagamenti annuali della quota campo.</p>
       
       <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
       <h4 style="margin-bottom: 10px;">Aggiungi Nuovo Utente</h4>
       <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
-        <div style="flex: 1; min-width: 200px;">
+        <div style="flex: 2; min-width: 180px;">
           <label style="font-size: 12px; font-weight: bold;">Cognome:</label>
           <input type="text" id="admin-new-cognome" class="admin-panel-input" placeholder="Es. Bianchi">
         </div>
-        <div style="flex: 1; min-width: 150px;">
+        <div style="flex: 1; min-width: 120px;">
           <label style="font-size: 12px; font-weight: bold;">PIN (opzionale):</label>
-          <input type="text" id="admin-new-pin" class="admin-panel-input" placeholder="Lascia vuoto per generarlo">
+          <input type="text" id="admin-new-pin" class="admin-panel-input" placeholder="Generato se vuoto">
+        </div>
+        <div style="flex: 1; min-width: 100px;">
+          <label style="font-size: 12px; font-weight: bold;">Importo (€):</label>
+          <input type="number" id="admin-new-importo" class="admin-panel-input" placeholder="Es. 50">
+        </div>
+        <div style="display: flex; align-items: center; height: 38px; margin-bottom: 10px;">
+          <label style="font-size: 12px; font-weight: bold; margin-right: 5px; cursor: pointer;">
+            <input type="checkbox" id="admin-new-pagato" style="margin-right: 4px;"> Quota Pagata
+          </label>
         </div>
         <div>
           <button class="admin-btn" onclick="aggiungiUtenteAdmin()" style="margin-bottom: 10px; height: 38px;">Aggiungi</button>
@@ -168,8 +192,8 @@
       </div>
       <p id="admin-action-msg" style="font-size: 12px; margin-top: 5px; font-weight: bold;"></p>
 
-      <h4 style="margin-top: 20px; margin-bottom: 10px;">Elenco Utenti Registrati</h4>
-      <div id="admin-users-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px;">
+      <h4 style="margin-top: 20px; margin-bottom: 10px;">Elenco Utenti e Stato Quote</h4>
+      <div id="admin-users-list" style="max-height: 280px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px;">
         Caricamento utenti...
       </div>
 
@@ -180,17 +204,13 @@
       </div>
     </div>
 
-    <div id="tabellone-container">
-      <!-- Il tabellone verrà iniettato qui via JavaScript -->
-    </div>
+    <div id="tabellone-container"></div>
   </div>
 
-  <!-- Footer con Versione dell'App -->
   <footer style="text-align: center; padding: 15px; color: #666; font-size: 12px; border-top: 1px solid #eee; background: #fff;">
-    Intercondominio Salario Alto - Versione App: <b>1.4.0</b>
+    Intercondominio Salario Alto - Versione App: <b>1.4.1</b>
   </footer>
 
-  <!-- Script Principale -->
   <script>
     let currentUser = null; 
     let listaUtentiCache = [];
@@ -215,7 +235,6 @@
 
     function avviaAutoRefresh() {
       if (refreshInterval) clearInterval(refreshInterval);
-      
       refreshInterval = setInterval(async () => {
         if (currentUser && document.visibilityState === 'visible') {
           await caricaPrenotazioniGoogle();
@@ -232,10 +251,7 @@
         const response = await fetch('/api/admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            adminPin: currentUser ? currentUser.pin : '0000', 
-            action: 'get-prenotazioni' 
-          })
+          body: JSON.stringify({ action: 'get-prenotazioni' })
         });
         const data = await response.json();
         if (response.ok && data) {
@@ -248,7 +264,7 @@
           prenotazioniGlobali = {};
         }
       } catch (e) {
-        console.error('Errore caricamento prenotazioni da Google Calendar:', e);
+        console.error('Errore caricamento prenotazioni:', e);
         prenotazioniGlobali = {};
       }
     }
@@ -260,16 +276,13 @@
       for (let chiave in nuovePrenotazioni) {
         const slotNuovo = nuovePrenotazioni[chiave] || [];
         const slotVecchio = prenotazioniPrecedenti[chiave] || [];
-
         const eroPresentePrima = slotVecchio.some(u => u.toLowerCase() === nomeMio);
         
-        if (eroPresentePrima) {
-          if (slotNuovo.length > slotVecchio.length) {
-            const nuoviUtenti = slotNuovo.filter(u => !slotVecchio.some(v => v.toLowerCase() === u.toLowerCase()));
-            if (nuoviUtenti.length > 0) {
-              const [dataIso, ora] = chiave.split('_');
-              alert(`🎾 Notifica Doppio: L'utente "${nuoviUtenti.join(', ')}" si è unito alla tua prenotazione del giorno ${dataIso} alle ore ${ora}! Adesso lo slot è per il doppio.`);
-            }
+        if (eroPresentePrima && slotNuovo.length > slotVecchio.length) {
+          const nuoviUtenti = slotNuovo.filter(u => !slotVecchio.some(v => v.toLowerCase() === u.toLowerCase()));
+          if (nuoviUtenti.length > 0) {
+            const [dataIso] = chiave.split('_');
+            alert(`🎾 Notifica Doppio: L'utente "${nuoviUtenti.join(', ')}" si è unito alla tua prenotazione del giorno ${dataIso}!`);
           }
         }
       }
@@ -294,8 +307,8 @@
           alert(data.error || 'Errore durante il salvataggio su Google Calendar');
         }
       } catch (e) {
-        console.error('Errore salvataggio Google Calendar:', e);
-        alert('Errore di connessione durante la sincronizzazione con Google Calendar.');
+        console.error('Errore salvataggio:', e);
+        alert('Errore di connessione durante la sincronizzazione.');
       }
     }
 
@@ -310,7 +323,7 @@
           listaUtentiCache = data;
         }
       } catch (err) {
-        console.error('Errore caricamento cache utenti:', err);
+        console.error('Errore cache utenti:', err);
       }
     }
 
@@ -344,7 +357,6 @@
             listaEl.style.display = 'none';
             document.getElementById('login-pin').focus();
           };
-          
           listaEl.appendChild(li);
         });
       } else {
@@ -413,29 +425,21 @@
           logoutUser();
         }
       } catch (err) {
-        console.error('Errore connessione:', err);
-        if (mostraErroriUI && errorEl) errorEl.textContent = 'Errore di connessione al server';
+        console.error('Errore sessione:', err);
+        if (mostraErroriUI && errorEl) errorEl.textContent = 'Errore di connessione';
         else logoutUser();
       }
     }
 
     function aggiornaInterfacciaUtente() {
       if (!currentUser) return;
-      
       const loggedDisplay = document.getElementById('logged-user-display');
       const logoutBtn = document.getElementById('logout-btn');
       const adminBtn = document.getElementById('admin-panel-btn');
 
       if (loggedDisplay) loggedDisplay.textContent = `Utente: ${currentUser.cognome} ${currentUser.isAdmin ? '(Admin)' : ''}`;
       if (logoutBtn) logoutBtn.style.display = 'inline-block';
-      
-      if (adminBtn) {
-        if (currentUser.isAdmin) {
-          adminBtn.style.display = 'inline-block';
-        } else {
-          adminBtn.style.display = 'none';
-        }
-      }
+      if (adminBtn) adminBtn.style.display = currentUser.isAdmin ? 'inline-block' : 'none';
     }
 
     function logoutUser() {
@@ -450,29 +454,26 @@
 
     async function cambiaMioPin() {
       if (!currentUser) return;
-
       const pinAttualeInserito = prompt("Inserisci il tuo PIN attuale:");
       if (pinAttualeInserito === null) return;
 
       if (pinAttualeInserito.trim() !== currentUser.pin) {
-        alert("Il PIN attuale inserito non è corretto.");
+        alert("Il PIN attuale non è corretto.");
         return;
       }
 
-      const nuevoPin1 = prompt("Inserisci il nuovo PIN desiderato (almeno 4 caratteri o numeri):");
-      if (nuevoPin1 === null) return;
-      const pinFinale = nuevoPin1.trim();
+      const nuovoPin1 = prompt("Inserisci il nuovo PIN (almeno 4 caratteri):");
+      if (nuovoPin1 === null) return;
+      const pinFinale = nuovoPin1.trim();
 
       if (!pinFinale || pinFinale.length < 3) {
-        alert("Il nuovo PIN non è valido o è troppo corto.");
+        alert("Il nuovo PIN è troppo corto.");
         return;
       }
 
-      const nuevoPin2 = prompt("Conferma il nuovo PIN:");
-      if (nuevoPin2 === null) return;
-
-      if (pinFinale !== nuevoPin2.trim()) {
-        alert("I PIN inseriti non coincidono.");
+      const nuovoPin2 = prompt("Conferma il nuovo PIN:");
+      if (nuovoPin2 === null || pinFinale !== nuovoPin2.trim()) {
+        alert("I PIN non coincidono.");
         return;
       }
 
@@ -488,17 +489,16 @@
           })
         });
 
-        const data = await res.json();
         if (res.ok) {
           currentUser.pin = pinFinale;
           localStorage.setItem('tennis_pin', pinFinale);
-          alert("PIN modificato con successo! Ricordati il nuovo PIN per i prossimi accessi.");
+          alert("PIN modificato con successo!");
         } else {
-          alert(data.error || "Errore durante la modifica del PIN.");
+          alert("Errore durante la modifica del PIN.");
         }
       } catch (e) {
         console.error(e);
-        alert("Errore di connessione al server.");
+        alert("Errore di connessione.");
       }
     }
 
@@ -524,26 +524,30 @@
         if (res.ok && Array.isArray(users)) {
           listaUtentiCache = users;
           let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
-          html += '<tr style="background: #f4f4f4; text-align: left;"><th style="padding: 6px; border: 1px solid #ddd;">Cognome</th><th style="padding: 6px; border: 1px solid #ddd;">PIN</th><th style="padding: 6px; border: 1px solid #ddd; text-align: center;">Azioni</th></tr>';
+          html += '<tr style="background: #f4f4f4; text-align: left;"><th style="padding: 6px; border: 1px solid #ddd;">Cognome</th><th style="padding: 6px; border: 1px solid #ddd;">PIN</th><th style="padding: 6px; border: 1px solid #ddd;">Quota Pagata</th><th style="padding: 6px; border: 1px solid #ddd; text-align: center;">Azioni</th></tr>';
           
           users.forEach(u => {
             const isMasterAdmin = u.cognome.toLowerCase() === 'admin';
+            const pagatoStatus = u.pagato === true || u.pagato === 'true';
+            const importoVal = u.importo_pagato ? ` (€${u.importo_pagato})` : '';
+
             html += `
               <tr>
                 <td style="padding: 6px; border: 1px solid #ddd;">
                   <b>${u.cognome}</b> ${u.is_admin ? '<span style="color:green;">(Admin)</span>' : ''}
-                  ${!isMasterAdmin ? `<div style="margin-top: 4px;"><button class="btn-blue" onclick="modificaCognomeAdmin('${u.cognome}')" style="font-size: 10px; padding: 3px 6px;">Modifica Nome</button></div>` : ''}
+                  ${!isMasterAdmin ? `<div style="margin-top: 4px;"><button class="btn-blue" onclick="modificaCognomeAdmin('${u.cognome}')" style="font-size: 10px; padding: 2px 5px;">Modifica Nome</button></div>` : ''}
                 </td>
                 <td style="padding: 6px; border: 1px solid #ddd;">
                   ${u.pin}
-                  ${!isMasterAdmin ? `
-                  <div style="margin-top: 4px; white-space: nowrap;">
-                    <button class="btn-blue" onclick="modificaPinAdmin('${u.cognome}', '${u.pin}')" style="font-size: 10px; padding: 3px 6px; margin-right: 3px;">Modifica PIN</button>
-                    <button class="btn-yellow" onclick="resettaPinAdmin('${u.cognome}')" style="font-size: 10px; padding: 3px 6px;">Reset (Random)</button>
-                  </div>` : ''}
+                  ${!isMasterAdmin ? `<div style="margin-top: 4px;"><button class="btn-blue" onclick="modificaPinAdmin('${u.cognome}', '${u.pin}')" style="font-size: 10px; padding: 2px 5px;">Modifica PIN</button></div>` : ''}
+                </td>
+                <td style="padding: 6px; border: 1px solid #ddd;">
+                  <span class="${pagatoStatus ? 'badge-pagato' : 'badge-non-pagato'}" onclick="toggleStatoPagamentoAdmin('${u.cognome}', ${pagatoStatus})" title="Clicca per invertire stato">
+                    ${pagatoStatus ? 'Pagato' + importoVal : 'Da pagare'}
+                  </span>
                 </td>
                 <td style="padding: 6px; border: 1px solid #ddd; text-align: center; white-space: nowrap;">
-                  ${!isMasterAdmin ? `<button class="btn-red" onclick="eliminaUtenteAdmin('${u.cognome}')" style="font-size: 11px; padding: 5px 10px;">Elimina</button>` : '<span style="color: #888; font-size: 11px;">Protetto</span>'}
+                  ${!isMasterAdmin ? `<button class="btn-red" onclick="eliminaUtenteAdmin('${u.cognome}')" style="font-size: 11px; padding: 4px 8px;">Elimina</button>` : '<span style="color: #888; font-size: 11px;">Protetto</span>'}
                 </td>
               </tr>
             `;
@@ -553,58 +557,43 @@
           if (usersListEl) usersListEl.innerHTML = html;
         }
       } catch (e) {
-        console.error('Errore caricamento lista utenti admin', e);
+        console.error('Errore lista utenti admin', e);
       }
     }
 
-    async function caricaLogAdmin() {
-      const logsListEl = document.getElementById('admin-logs-list');
-      if (!logsListEl) return;
-      
-      logsListEl.innerHTML = 'Caricamento log in corso...';
+    async function toggleStatoPagamentoAdmin(cognome, statoAttuale) {
+      const nuovoStato = !statoAttuale;
+      const importoStr = nuovoStato ? prompt("Inserisci l'importo pagato (es. 50):", "50") : "0";
+      if (nuovoStato && importoStr === null) return;
 
       try {
-        const res = await fetch('/api/admin', {
+        const res = await fetch('/api/pagamenti', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminPin: currentUser.pin, action: 'get-logs' })
+          body: JSON.stringify({
+            action: 'update-pagamento',
+            cognome: cognome,
+            pagato: nuovoStato,
+            importo: importoStr ? parseFloat(importoStr) : 0
+          })
         });
-        
-        const logs = await res.json();
-        if (res.ok && Array.isArray(logs)) {
-          if (logs.length === 0) {
-            logsListEl.innerHTML = 'Nessuna attività registrata finora.';
-            return;
-          }
 
-          let html = '<table style="width: 100%; border-collapse: collapse; font-size: 11px;">';
-          html += '<tr style="background: #eee; text-align: left;"><th style="padding: 4px; border: 1px solid #ddd;">Data/Ora</th><th style="padding: 4px; border: 1px solid #ddd;">Utente</th><th style="padding: 4px; border: 1px solid #ddd;">Azione</th><th style="padding: 4px; border: 1px solid #ddd;">Dettagli</th></tr>';
-          
-          logs.forEach(l => {
-            const dataFormattata = new Date(l.timestamp).toLocaleString('it-IT');
-            html += `
-              <tr>
-                <td style="padding: 4px; border: 1px solid #ddd; white-space: nowrap;">${dataFormattata}</td>
-                <td style="padding: 4px; border: 1px solid #ddd;"><b>${l.user_email || 'N.D.'}</b></td>
-                <td style="padding: 4px; border: 1px solid #ddd; color: #2b6cb0;">${l.action}</td>
-                <td style="padding: 4px; border: 1px solid #ddd;">${JSON.stringify(l.metadata || {})}</td>
-              </tr>
-            `;
-          });
-          html += '</table>';
-          logsListEl.innerHTML = html;
+        if (res.ok) {
+          caricaListaUtentiAdmin();
         } else {
-          logsListEl.innerHTML = '<span style="color: red;">Errore nel caricamento dei log.</span>';
+          alert("Errore durante l'aggiornamento del pagamento.");
         }
       } catch (e) {
         console.error(e);
-        logsListEl.innerHTML = '<span style="color: red;">Errore di connessione al server.</span>';
+        alert("Errore di connessione.");
       }
     }
 
     async function aggiungiUtenteAdmin() {
       const cognome = document.getElementById('admin-new-cognome').value.trim();
       const pin = document.getElementById('admin-new-pin').value.trim();
+      const pagatoCheckbox = document.getElementById('admin-new-pagato');
+      const importoInput = document.getElementById('admin-new-importo');
       const msgEl = document.getElementById('admin-action-msg');
 
       if (!cognome) {
@@ -625,11 +614,29 @@
           })
         });
         const data = await res.json();
+        
         if (res.ok) {
+          const isPagato = pagatoCheckbox ? pagatoCheckbox.checked : false;
+          const importoVal = importoInput ? (importoInput.value || '0') : '0';
+
+          await fetch('/api/pagamenti', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update-pagamento',
+              cognome: cognome,
+              pagato: isPagato,
+              importo: importoVal
+            })
+          });
+
           msgEl.style.color = 'green';
-          msgEl.textContent = data.message;
+          msgEl.textContent = `Utente ${cognome} aggiunto con successo!`;
           document.getElementById('admin-new-cognome').value = '';
           document.getElementById('admin-new-pin').value = '';
+          if (pagatoCheckbox) pagatoCheckbox.checked = false;
+          if (importoInput) importoInput.value = '';
+          
           caricaListaUtentiAdmin();
           caricaLogAdmin();
           scaricaListaUtentiPerAutocheck();
@@ -640,18 +647,53 @@
       } catch (e) {
         console.error(e);
         msgEl.style.color = 'red';
-        msgEl.textContent = 'Errore di connessione al server.';
+        msgEl.textContent = 'Errore di connessione.';
+      }
+    }
+
+    async function caricaLogAdmin() {
+      const logsListEl = document.getElementById('admin-logs-list');
+      if (!logsListEl) return;
+      logsListEl.innerHTML = 'Caricamento log...';
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminPin: currentUser.pin, action: 'get-logs' })
+        });
+        const logs = await res.json();
+        if (res.ok && Array.isArray(logs)) {
+          if (logs.length === 0) {
+            logsListEl.innerHTML = 'Nessuna attività registrata.';
+            return;
+          }
+          let html = '<table style="width: 100%; border-collapse: collapse; font-size: 11px;">';
+          html += '<tr style="background: #eee;"><th style="padding: 4px; border: 1px solid #ddd;">Data/Ora</th><th style="padding: 4px; border: 1px solid #ddd;">Utente</th><th style="padding: 4px; border: 1px solid #ddd;">Azione</th><th style="padding: 4px; border: 1px solid #ddd;">Dettagli</th></tr>';
+          
+          logs.forEach(l => {
+            const dataFormattata = new Date(l.timestamp).toLocaleString('it-IT');
+            html += `
+              <tr>
+                <td style="padding: 4px; border: 1px solid #ddd; white-space: nowrap;">${dataFormattata}</td>
+                <td style="padding: 4px; border: 1px solid #ddd;"><b>${l.user_email || 'N.D.'}</b></td>
+                <td style="padding: 4px; border: 1px solid #ddd; color: #2b6cb0;">${l.action}</td>
+                <td style="padding: 4px; border: 1px solid #ddd;">${JSON.stringify(l.metadata || {})}</td>
+              </tr>
+            `;
+          });
+          html += '</table>';
+          logsListEl.innerHTML = html;
+        }
+      } catch (e) {
+        console.error(e);
+        logsListEl.innerHTML = '<span style="color: red;">Errore caricamento log.</span>';
       }
     }
 
     async function modificaCognomeAdmin(vecchioCognome) {
-      const nuovoCognome = prompt(`Correggi il cognome per l'utente: ${vecchioCognome}\n\nInserisci il nuovo cognome corretto:`, vecchioCognome);
-      if (nuovoCognome === null) return;
-      const cognomeFinale = nuovoCognome.trim();
-      if (!cognomeFinale) {
-        alert("Il cognome non può essere vuoto.");
-        return;
-      }
+      const nuovoCognome = prompt(`Nuovo cognome per ${vecchioCognome}:`, vecchioCognome);
+      if (nuovoCognome === null || !nuovoCognome.trim()) return;
 
       try {
         const res = await fetch('/api/admin', {
@@ -661,59 +703,23 @@
             adminPin: currentUser.pin,
             action: 'update-cognome',
             vecchioCognome: vecchioCognome,
-            nuovoCognome: cognomeFinale
+            nuovoCognome: nuovoCognome.trim()
           })
         });
-        const data = await res.json();
         if (res.ok) {
-          alert(`Cognome aggiornato con successo a: ${cognomeFinale}`);
           caricaListaUtentiAdmin();
-          caricaLogAdmin();
           scaricaListaUtentiPerAutocheck();
         } else {
-          alert(data.error || 'Errore durante la modifica del cognome.');
+          alert("Errore durante la modifica.");
         }
       } catch (e) {
         console.error(e);
-        alert('Errore di connessione al server.');
-      }
-    }
-
-    async function resettaPinAdmin(cognome) {
-      if (!confirm(`Sei sicuro di voler generare un nuovo PIN randomico per ${cognome}?`)) return;
-
-      try {
-        const res = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminPin: currentUser.pin,
-            action: 'reset-pin',
-            cognome: cognome
-          })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          alert(`PIN resettato con successo per ${cognome}!`);
-          caricaListaUtentiAdmin();
-          caricaLogAdmin();
-        } else {
-          alert(data.error || 'Errore durante il reset del PIN.');
-        }
-      } catch (e) {
-        console.error(e);
-        alert('Errore di connessione al server.');
       }
     }
 
     async function modificaPinAdmin(cognome, pinAttuale) {
-      const nuovoPin = prompt(`Modifica PIN per l'utente: ${cognome}\n\nInserisci il nuovo PIN desiderato:`, pinAttuale);
-      if (nuovoPin === null) return;
-      const pinFinale = nuovoPin.trim();
-      if (!pinFinale) {
-        alert("Il PIN non può essere vuoto.");
-        return;
-      }
+      const nuovoPin = prompt(`Nuovo PIN per ${cognome}:`, pinAttuale);
+      if (nuovoPin === null || !nuovoPin.trim()) return;
 
       try {
         const res = await fetch('/api/admin', {
@@ -723,25 +729,21 @@
             adminPin: currentUser.pin,
             action: 'reset-pin',
             cognome: cognome,
-            newPin: pinFinale
+            newPin: nuovoPin.trim()
           })
         });
-        const data = await res.json();
         if (res.ok) {
-          alert(`PIN modificato con successo per ${cognome} (Nuovo PIN: ${pinFinale})`);
           caricaListaUtentiAdmin();
-          caricaLogAdmin();
         } else {
-          alert(data.error || 'Errore durante la modifica del PIN.');
+          alert("Errore durante la modifica del PIN.");
         }
       } catch (e) {
         console.error(e);
-        alert('Errore di connessione al server.');
       }
     }
 
     async function eliminaUtenteAdmin(cognome) {
-      if (!confirm(`Sei sicuro di voler eliminare l'utente ${cognome}?`)) return;
+      if (!confirm(`Eliminare l'utente ${cognome}?`)) return;
 
       try {
         const res = await fetch('/api/admin', {
@@ -753,17 +755,14 @@
             cognome: cognome
           })
         });
-        const data = await res.json();
         if (res.ok) {
           caricaListaUtentiAdmin();
-          caricaLogAdmin();
           scaricaListaUtentiPerAutocheck();
         } else {
-          alert(data.error || 'Errore durante l eliminazione.');
+          alert("Errore durante l'eliminazione.");
         }
       } catch (e) {
         console.error(e);
-        alert('Errore di connessione al server.');
       }
     }
 
@@ -787,54 +786,34 @@
       try {
         const oggi = new Date();
         const giorniArray = [];
-        
         for (let i = 0; i < 3; i++) {
           const d = new Date(oggi);
           d.setDate(oggi.getDate() + i);
-          
-          const options = { weekday: 'short', day: 'numeric', month: 'short' };
-          const dataFormattata = d.toLocaleDateString('it-IT', options);
-          const dataIso = d.toISOString().split('T')[0];
-          
-          giorniArray.push({ titolo: dataFormattata, iso: dataIso });
+          giorniArray.push({
+            titolo: d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }),
+            iso: d.toISOString().split('T')[0]
+          });
         }
 
         let html = `
           <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <h3>Intercondominio Salario Alto - Tabellone Orari - Campo da Tennis Via Suvereto 247</h3>
-            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b> ${currentUser.isAdmin ? '<span style="color: #2b6cb0; font-weight: bold;">[Modalità Admin: Gestione Totale]</span>' : ''}. Orario continuato dalle 08:00 alle 21:00.</p>
+            <p style="color: #666; font-size: 14px;">Benvenuto, <b>${currentUser.cognome}</b> ${currentUser.isAdmin ? '<span style="color: #2b6cb0; font-weight: bold;">[Admin]</span>' : ''}. Orario 08:00 - 21:00.</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <thead>
                 <tr style="background: #f4f4f4; text-align: left;">
-                  <th style="padding: 10px; border: 1px solid #ddd; width: 22%;">Periodo</th>
+                  <th style="padding: 10px; border: 1px solid #ddd; width: 22%;">Orario</th>
         `;
-
         giorniArray.forEach(g => {
           html += `<th style="padding: 10px; border: 1px solid #ddd; text-align: center;">${g.titolo}</th>`;
         });
+        html += `</tr></thead><tbody>`;
 
-        html += `
-                </tr>
-              </thead>
-              <tbody>
-        `;
-
-        const ore = [];
         for (let h = 8; h <= 21; h++) {
-          const oraStringa = h < 10 ? `0${h}:00` : `${h}:00`;
-          ore.push(oraStringa);
-        }
-        
-        ore.forEach(ora => {
-          const [hNum] = ora.split(':');
-          const hNext = parseInt(hNum, 10) + 1;
-          const oraFine = hNext < 10 ? `0${hNext}:00` : `${hNext}:00`;
-          const displayOrario = `${ora} - ${oraFine}`;
-
-          html += `
-            <tr>
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #fafafa; white-space: nowrap;">${displayOrario}</td>
-          `;
+          const ora = h < 10 ? `0${h}:00` : `${h}:00`;
+          const oraFine = (h + 1) < 10 ? `0${h + 1}:00` : `${h + 1}:00`;
+          
+          html += `<tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #fafafa;">${ora} - ${oraFine}</td>`;
 
           giorniArray.forEach(g => {
             const chiaveSlot = `${g.iso}_${ora}`;
@@ -842,16 +821,14 @@
 
             if (utentiSlot.length > 0) {
               const eMio = utentiSlot.some(u => u.toLowerCase() === currentUser.cognome.toLowerCase());
-              const testoNomi = utentiSlot.join(' & ');
               const pieno = utentiSlot.length >= 2;
-
               let bgStyle = eMio ? '#1976d2' : '#d32f2f'; 
               if (pieno) bgStyle = '#f57f17'; 
               if (currentUser.isAdmin) bgStyle = '#475569'; 
 
               html += `
                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center; background: ${bgStyle}; cursor: pointer;" onclick="gestisciSlot('${g.iso}', '${ora}')">
-                  <span style="color: #ffffff; font-weight: bold; font-size: 12px;">${testoNomi} ${pieno ? '(Doppio)' : ''}</span>
+                  <span style="color: #ffffff; font-weight: bold; font-size: 12px;">${utentiSlot.join(' & ')} ${pieno ? '(Doppio)' : ''}</span>
                 </td>
               `;
             } else {
@@ -862,152 +839,120 @@
               `;
             }
           });
-
           html += `</tr>`;
-        });
-
-        html += `
-              </tbody>
-            </table>
-          </div>
-        `;
+        }
+        html += `</tbody></table></div>`;
 
         if (tabelloneDiv.innerHTML !== html) {
           tabelloneDiv.innerHTML = html;
         }
       } catch (err) {
-        console.error('Errore nel caricamento del tabellone:', err);
+        console.error('Errore tabellone:', err);
       }
     }
 
     async function gestisciSlot(dataIso, ora) {
       await caricaPrenotazioniGoogle();
-
       const chiaveSlot = `${dataIso}_${ora}`;
-      if (!prenotazioniGlobali[chiaveSlot]) {
-        prenotazioniGlobali[chiaveSlot] = [];
-      }
+      if (!prenotazioniGlobali[chiaveSlot]) prenotazioniGlobali[chiaveSlot] = [];
       const utentiSlot = prenotazioniGlobali[chiaveSlot];
 
       const [oreSlot] = ora.split(':');
-      const dataOraSlot = new Date(`${dataIso}T${oreSlot}:00:00`);
-      const adesso = new Date();
-
-      if (dataOraSlot < adesso && !currentUser.isAdmin) {
-        alert("Non è possibile prenotare uno slot con data o orario già trascorsi!");
+      if (new Date(`${dataIso}T${oreSlot}:00:00`) < new Date() && !currentUser.isAdmin) {
+        alert("Non puoi prenotare in un orario passato!");
         return;
       }
 
       if (currentUser.isAdmin) {
         if (utentiSlot.length === 0) {
-          const cognomeCondomino = prompt("[ADMIN] Inserisci il cognome del condomino per cui effettuare la prenotazione:");
-          if (cognomeCondomino && cognomeCondomino.trim() !== '') {
-            utentiSlot.push(cognomeCondomino.trim());
+          const condomino = prompt("[ADMIN] Cognome condomino per la prenotazione:");
+          if (condomino && condomino.trim()) {
+            utentiSlot.push(condomino.trim());
             await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'ADMIN_PRENOTAZIONE');
             await caricaTabellone();
           }
         } else {
-          const scelta = prompt(`[ADMIN] Slot occupato da: [ ${utentiSlot.join(' - ')} ]\nScegli un'opzione:\n1. Rimuovi un utente\n2. Libera tutto lo slot\n3. Aggiungi un secondo utente (Doppio)\n\nDigita 1, 2 o 3:`);
-          
+          const scelta = prompt(`Slot occupato da: [ ${utentiSlot.join(' - ')} ]\n1. Rimuovi utente\n2. Libera tutto\n3. Aggiungi secondo (Doppio)\nDigita 1, 2 o 3:`);
           if (scelta === '1') {
-            const utenteDaRimuovere = prompt(`Digita esattamente il cognome dell'utente da rimuovere (${utentiSlot.join(', ')}):`);
-            if (utenteDaRimuovere) {
-              prenotazioniGlobali[chiaveSlot] = utentiSlot.filter(u => u.toLowerCase() !== utenteDaRimuovere.trim().toLowerCase());
-              const nuoviUtenti = prenotazioniGlobali[chiaveSlot];
-              if (nuoviUtenti.length === 0) delete prenotazioniGlobali[chiaveSlot];
-              await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'ADMIN_RIMOZIONE_UTENTE');
+            const daRimuovere = prompt(`Cognome esatto da rimuovere (${utentiSlot.join(', ')}):`);
+            if (daRimuovere) {
+              const nuovi = utentiSlot.filter(u => u.toLowerCase() !== daRimuovere.trim().toLowerCase());
+              await salvaPrenotazioneGoogle(chiaveSlot, nuovi, 'ADMIN_RIMOZIONE_UTENTE');
               await caricaTabellone();
             }
           } else if (scelta === '2') {
-            delete prenotazioniGlobali[chiaveSlot];
             await salvaPrenotazioneGoogle(chiaveSlot, [], 'ADMIN_LIBERA_SLOT');
             await caricaTabellone();
-          } else if (scelta === '3') {
-            if (utentiSlot.length >= 2) {
-              alert("Lo slot ha già 2 giocatori.");
-            } else {
-              const nuovoUtente = prompt("Inserisci il secondo condomino:");
-              if (nuovoUtente && nuovoUtente.trim() !== '') {
-                utentiSlot.push(nuovoUtente.trim());
-                await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'ADMIN_AGGIUNGI_DOPPIO');
-                await caricaTabellone();
-              }
+          } else if (scelta === '3' && utentiSlot.length < 2) {
+            const secondo = prompt("Inserisci il secondo condomino:");
+            if (secondo && secondo.trim()) {
+              utentiSlot.push(secondo.trim());
+              await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'ADMIN_AGGIUNGI_DOPPIO');
+              await caricaTabellone();
             }
           }
         }
         return;
       }
 
-      let slotPrenotatiOggi = 0;
-      for (let chiave in prenotazioniGlobali) {
-        if (chiave.startsWith(dataIso)) {
-          prenotazioniGlobali[chiave].forEach(u => {
-            if (u.toLowerCase() === currentUser.cognome.toLowerCase()) {
-              slotPrenotatiOggi++;
-            }
+      let slotMieiOggi = 0;
+      for (let k in prenotazioniGlobali) {
+        if (k.startsWith(dataIso)) {
+          prenotazioniGlobali[k].forEach(u => {
+            if (u.toLowerCase() === currentUser.cognome.toLowerCase()) slotMieiOggi++;
           });
         }
       }
 
-      const occorrenzeMioNomeInQuestoSlot = utentiSlot.filter(u => u.toLowerCase() === currentUser.cognome.toLowerCase()).length;
+      const MieiInSlot = utentiSlot.filter(u => u.toLowerCase() === currentUser.cognome.toLowerCase()).length;
 
-      if (occorrenzeMioNomeInQuestoSlot > 0) {
-        if (occorrenzeMioNomeInQuestoSlot === 1 && utentiSlot.length === 1) {
-          const sceltaDoppio = confirm(
-            "Risulti già prenotato in questo slot.\n\n" +
-            "• Premi OK per aggiungere una seconda volta il tuo cognome (Raddoppio / Doppio)\n" +
-            "• Premi Annulla per cancellare la prenotazione"
-          );
-
-          if (sceltaDoppio) {
-            if (slotPrenotatiOggi >= 2) {
-              alert("Hai già raggiunto il limite massimo di 2 prenotazioni per questa giornata.");
+      if (MieiInSlot > 0) {
+        if (MieiInSlot === 1 && utentiSlot.length === 1) {
+          if (confirm("Sei già prenotato.\n• OK: Raddoppia (Doppio)\n• Annulla: Cancella prenotazione")) {
+            if (slotMieiOggi >= 2) {
+              alert("Hai già raggiunto il limite di 2 prenotazioni oggi.");
               return;
             }
-
             utentiSlot.push(currentUser.cognome);
             await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'UNIONE_DOPPIO');
             await caricaTabellone();
           } else {
-            const nuoviUtenti = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
+            const nuovi = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
+            await salvaPrenotazioneGoogle(chiaveSlot, nuovi, 'CANCELLAZIONE');
             await caricaTabellone();
           }
         } else {
-          if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
+          if (confirm(`Vuoi cancellare la tua prenotazione del ${dataIso} alle ${ora}?`)) {
             let rimosso = false;
-            const nuoviUtenti = utentiSlot.filter(u => {
+            const nuovi = utentiSlot.filter(u => {
               if (!rimosso && u.toLowerCase() === currentUser.cognome.toLowerCase()) {
                 rimosso = true;
                 return false;
               }
               return true;
             });
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
+            await salvaPrenotazioneGoogle(chiaveSlot, nuovi, 'CANCELLAZIONE');
             await caricaTabellone();
           }
         }
       } else {
         if (utentiSlot.length >= 2) {
-          alert("Questo slot ha già raggiunto il massimo di 2 giocatori.");
+          alert("Questo slot ha già 2 giocatori.");
           return;
         }
-
-        if (slotPrenotatiOggi >= 2) {
-          alert("Hai già effettuato il limite massimo di 2 prenotazioni per questa giornata.");
+        if (slotMieiOggi >= 2) {
+          alert("Hai già raggiunto il limite massimo di 2 prenotazioni per questa giornata.");
           return;
         }
 
         const msg = utentiSlot.length === 1 
-          ? `C'è già ${utentiSlot[0]} in questo slot. Vuoi unirti per fare il doppio il giorno ${dataIso} alle ore ${ora}?`
-          : `Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`;
+          ? `C'è già ${utentiSlot[0]}. Vuoi unirti per fare il doppio il ${dataIso} alle ${ora}?`
+          : `Confermi la prenotazione del campo per il ${dataIso} alle ${ora}?`;
 
         if (confirm(msg)) {
-          const tipoAzioneLog = utentiSlot.length === 1 ? 'UNIONE_DOPPIO' : 'NUOVA_PRENOTAZIONE';
+          const tipo = utentiSlot.length === 1 ? 'UNIONE_DOPPIO' : 'NUOVA_PRENOTAZIONE';
           utentiSlot.push(currentUser.cognome);
-          await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, tipoAzioneLog);
+          await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, tipo);
           await caricaTabellone();
         }
       }
