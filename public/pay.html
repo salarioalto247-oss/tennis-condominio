@@ -21,7 +21,7 @@
         <section class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4 flex justify-between items-center">
             <div>
                 <h2 class="text-lg font-semibold text-blue-900 mb-1">Stato Sistema Pagamenti</h2>
-                <p class="text-blue-700 text-sm">Gestisci lo stato delle quote (Vero/Falso). L'attivo si aggiorna automaticamente per l'anno in corso (2026).</p>
+                <p class="text-blue-700 text-sm">Quota pagata (Vero/Falso booleano). Il campo attivo diventa "Sì" solo se la quota è Vero e l'anno è il 2026.</p>
             </div>
             <button onclick="caricaPagamenti()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition shadow-sm">
                 Aggiorna Tabella
@@ -34,7 +34,7 @@
                     <thead>
                         <tr class="bg-gray-100 text-gray-700 text-sm border-b">
                             <th class="p-3 font-semibold">Socio</th>
-                            <th class="p-3 font-semibold">Quota Pagata</th>
+                            <th class="p-3 font-semibold">Quota Pagata (Booleano)</th>
                             <th class="p-3 font-semibold">Anno Quota</th>
                             <th class="p-3 font-semibold">Data Pagamento</th>
                             <th class="p-3 font-semibold">Attivo (Auto)</th>
@@ -72,7 +72,7 @@
     </div>
 
     <script>
-        const ANNO_CORRENTE = new Date().getFullYear(); // 2026
+        const ANNO_CORRENTE = 2026;
 
         function checkAccess() {
             const isAdmin = localStorage.getItem('isAdmin') === 'true';
@@ -141,28 +141,34 @@
                     tbody.innerHTML = '';
                     result.data.forEach((u, index) => {
                         const cognomeSafe = u.cognome || '';
-                        
-                        // Quota pagata booleana (true/false)
-                        const quotaPagata = u.quota_pagata === true || u.quota_pagata === 'true';
-                        const annoQuota = u.anno_quota || ANNO_CORRENTE;
+                        const quotaPagata = u.quota_pagata === true;
+                        const annoQuota = u.anno_quota ? parseInt(u.anno_quota, 10) : ANNO_CORRENTE;
                         const dataPagamento = u.data_pagamento ? u.data_pagamento.split('T')[0] : '';
 
-                        // Calcolo automatico di "attivo": "si" se quota è true e l'anno è quello in corso
-                        const isAttivoAuto = quotaPagata && (parseInt(annoQuota, 10) === ANNO_CORRENTE);
+                        // Calcolo attivo
+                        const isAttivoAuto = quotaPagata && (annoQuota === ANNO_CORRENTE);
                         const testoAttivo = isAttivoAuto ? 'Sì' : 'No';
                         const badgeColor = isAttivoAuto ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+
+                        // Generazione opzioni per la select dell'anno (da 2024 a 2030)
+                        let anniOptions = '';
+                        for (let anno = 2024; anno <= 2030; anno++) {
+                            anniOptions += `<option value="${anno}" ${annoQuota === anno ? 'selected' : ''}>${anno}</option>`;
+                        }
 
                         tbody.innerHTML += `
                             <tr class="hover:bg-gray-50" id="row-${index}">
                                 <td class="p-3 font-medium text-gray-800">${cognomeSafe}</td>
                                 <td class="p-3">
                                     <select id="quota-${index}" onchange="aggiornaStatoAttivo(${index})" class="px-2 py-1 border rounded text-sm font-medium">
-                                        <option value="true" ${quotaPagata ? 'selected' : ''}>Vero (Pagata)</option>
-                                        <option value="false" ${!quotaPagata ? 'selected' : ''}>Falso (Non pagata)</option>
+                                        <option value="true" ${quotaPagata ? 'selected' : ''}>Vero (true)</option>
+                                        <option value="false" ${!quotaPagata ? 'selected' : ''}>Falso (false)</option>
                                     </select>
                                 </td>
                                 <td class="p-3">
-                                    <input type="number" id="anno-${index}" value="${annoQuota}" oninput="aggiornaStatoAttivo(${index})" placeholder="2026" class="w-20 px-2 py-1 border rounded text-sm">
+                                    <select id="anno-${index}" onchange="aggiornaStatoAttivo(${index})" class="px-2 py-1 border rounded text-sm font-medium">
+                                        ${anniOptions}
+                                    </select>
                                 </td>
                                 <td class="p-3">
                                     <input type="date" id="data-${index}" value="${dataPagamento}" class="px-2 py-1 border rounded text-sm">
@@ -186,7 +192,6 @@
             }
         }
 
-        // Funzione per aggiornare in tempo reale la visualizzazione del campo "Attivo" mentre l'utente cambia i campi
         function aggiornaStatoAttivo(index) {
             const quotaVal = document.getElementById(`quota-${index}`).value === 'true';
             const annoVal = parseInt(document.getElementById(`anno-${index}`).value, 10);
@@ -200,9 +205,9 @@
 
         async function salvaQuota(cognome, index) {
             const quota = document.getElementById(`quota-${index}`).value === 'true';
-            const anno = document.getElementById(`anno-${index}`).value;
+            const anno = parseInt(document.getElementById(`anno-${index}`).value, 10);
             const dataPagamento = document.getElementById(`data-${index}`).value;
-            const attivo = quota && (parseInt(anno, 10) === ANNO_CORRENTE); // Calcolato automaticamente
+            const attivo = quota && (anno === ANNO_CORRENTE);
 
             try {
                 const response = await fetch('/api/pagamenti-api', {
@@ -211,7 +216,7 @@
                     body: JSON.stringify({
                         cognome: cognome,
                         quota_pagata: quota,
-                        anno_quota: anno ? parseInt(anno, 10) : null,
+                        anno_quota: anno,
                         data_pagamento: dataPagamento || null,
                         attivo: attivo
                     })
