@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const { action } = body;
 
+      // 1. Recupero Prenotazioni da Google Calendar
       if (action === 'get-prenotazioni') {
         if (!calendarId || !clientEmail || !privateKey) {
           return res.status(200).json({});
@@ -86,6 +87,7 @@ export default async function handler(req, res) {
         }
       }
 
+      // 2. Salvataggio / Modifica Prenotazione su Google Calendar
       if (action === 'save-prenotazione') {
         const { chiave, utenti } = body;
         if (!chiave) return res.status(400).json({ error: 'Chiave slot mancante' });
@@ -158,6 +160,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
       }
 
+      // 3. Gestione Utenti (Base)
       if (action === 'get-users') {
         const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*`, {
           headers: {
