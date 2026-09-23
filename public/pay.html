@@ -9,7 +9,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen p-6">
 
-    <!-- Area protetta (Visibile solo se loggati correttamente) -->
+    <!-- Area protetta (Visibile solo se loggati come Admin) -->
     <div id="admin-container" class="max-w-5xl mx-auto bg-white shadow-md rounded-lg p-6 hidden">
         <header class="flex justify-between items-center border-b pb-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800">💳 Gestione Pagamenti Tennis</h1>
@@ -51,11 +51,11 @@
         </section>
     </div>
 
-    <!-- Schermata di Login che sfrutta l'API /api/admin esistente -->
+    <!-- Schermata di Login con PIN identica a index.html -->
     <div id="login-container" class="max-w-md mx-auto mt-24 bg-white shadow-md rounded-lg p-8 text-center border border-gray-100">
         <div class="text-blue-600 text-4xl mb-3">🔒</div>
         <h2 class="text-xl font-bold text-gray-800 mb-2">Accesso Amministratore</h2>
-        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN di amministrazione.</p>
+        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN amministrativo per accedere ai pagamenti.</p>
         
         <form onsubmit="gestisciLogin(event)" class="space-y-4">
             <input type="password" id="admin-pin" placeholder="Inserisci PIN" required
@@ -63,7 +63,7 @@
             <button type="submit" id="btn-accedi" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
                 Accedi
             </button>
-            <p id="login-error" class="text-red-500 text-xs hidden">PIN errato o non autorizzato.</p>
+            <p id="login-error" class="text-red-500 text-xs hidden">PIN non valido o non amministratore.</p>
         </form>
         
         <div class="mt-6 border-t pt-4">
@@ -71,7 +71,7 @@
         </div>
     </div>
 
-    <!-- Logica di autenticazione integrata con /api/admin -->
+    <!-- Logica di autenticazione basata su /api/admin esattamente come index.html -->
     <script>
         function checkAccess() {
             const isAdmin = localStorage.getItem('isAdmin') === 'true';
@@ -87,35 +87,40 @@
 
         async function gestisciLogin(event) {
             event.preventDefault();
-            const pinInserito = document.getElementById('admin-pin').value.trim();
-            const errorElement = document.getElementById('login-error');
+            const pinInput = document.getElementById('admin-pin').value.trim();
+            const errorEl = document.getElementById('login-error');
             const btnAccedi = document.getElementById('btn-accedi');
 
-            errorElement.classList.add('hidden');
+            errorEl.classList.add('hidden');
             btnAccedi.textContent = 'Verifica in corso...';
             btnAccedi.disabled = true;
 
             try {
-                // Chiama la stessa API /api/admin che usa la home
+                // Interroga /api/admin esattamente come fa index.html per scaricare la lista utenti
                 const response = await fetch('/api/admin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin: pinInserito })
+                    body: JSON.stringify({ adminPin: pinInput, action: 'get-users' })
                 });
+                const data = await response.json();
 
-                const risultato = await response.json();
+                if (response.ok && Array.isArray(data)) {
+                    // Verifica se esiste un utente con questo PIN che sia amministratore (is_admin === true oppure master admin '0000')
+                    const userFound = data.find(u => u.pin === pinInput && (u.is_admin || u.cognome.toLowerCase() === 'admin'));
+                    const isMaster = (pinInput === '0000');
 
-                // Verifica la risposta dell'API admin (adatta la condizione se l'API restituisce success: true o authorized: true)
-                if (response.ok && (risultato.success || risultato.authorized || risultato.ok)) {
-                    localStorage.setItem('isAdmin', 'true');
-                    checkAccess();
-                } else {
-                    errorElement.classList.remove('hidden');
+                    if (userFound || isMaster) {
+                        localStorage.setItem('isAdmin', 'true');
+                        checkAccess();
+                        return;
+                    }
                 }
-            } catch (error) {
-                console.error("Errore durante il login:", error);
-                errorElement.textContent = "Errore di connessione al server.";
-                errorElement.classList.remove('hidden');
+                
+                errorEl.classList.remove('hidden');
+            } catch (err) {
+                console.error('Errore di connessione:', err);
+                errorEl.textContent = 'Errore di connessione al server';
+                errorEl.classList.remove('hidden');
             } finally {
                 btnAccedi.textContent = 'Accedi';
                 btnAccedi.disabled = false;
