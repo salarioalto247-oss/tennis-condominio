@@ -5,3 +5,4 @@
 # Dipendenze Node.js
 node_modules/
 package-lock.json # (Opzionale, a seconda se vuoi tracciarlo o meno)
+.vercel

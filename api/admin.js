@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -9,129 +11,175 @@ export default async function handler(req, res) {
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-
   const calendarId = process.env.GOOGLE_CALENDAR_ID;
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
-  if (privateKey) {
-    privateKey = privateKey.replace(/\\n/g, '\n');
-  }
+  const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
   if (!supabaseUrl || !supabaseKey) {
     return res.status(500).json({ error: 'Variabili d ambiente Supabase non configurate' });
   }
 
+  async function getGoogleAccessToken() {
+    if (!serviceAccountJson) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON mancante');
+    const sa = JSON.parse(serviceAccountJson);
+
+    const header = JSON.stringify({ alg: 'RS256', typ: 'JWT' });
+    const now = Math.floor(Date.now() / 1000);
+    const claim = JSON.stringify({
+      iss: sa.client_email,
+      scope: 'https://www.googleapis.com/auth/calendar',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: now + 3600,
+      iat: now
+    });
+
+    const base64UrlEncode = (str) => Buffer.from(str).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const unsignedJwt = base64UrlEncode(header) + '.' + base64UrlEncode(claim);
+
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(unsignedJwt);
+    const signature = sign.sign(sa.private_key, 'base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const jwt = unsignedJwt + '.' + signature;
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+    });
+
+    const tokenData = await tokenRes.json();
+    if (!tokenRes.ok) throw new Error('Errore autenticazione Google: ' + JSON.stringify(tokenData));
+    return tokenData.access_token;
+  }
+
+  const scriviLog = async (userEmail, actionType, details) => {
+    try {
+      const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : 'N.D.';
+      
+      const metadataConIp = {
+        ...details,
+        ip_dispositivo: clientIp
+      };
+
+      await fetch(`${supabaseUrl}/rest/v1/activity_logs`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          user_email: userEmail || 'Amministratore',
+          action: actionType,
+          ip_address: clientIp,
+          metadata: metadataConIp
+        })
+      });
+    } catch (e) {
+      console.error('Errore scrittura log:', e);
+    }
+  };
+
   try {
+    const formatUsers = (users) => {
+      if (!Array.isArray(users)) return [];
+      return users.map(u => ({
+        ...u,
+        isAdmin: u.is_admin === true || u.is_admin === 'TRUE' || u.is_admin === 'true'
+      }));
+    };
+
     if (req.method === 'GET') {
-      const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*&order=cognome.asc`, {
         headers: {
           'apikey': supabaseKey,
           'Authorization': `Bearer ${supabaseKey}`
         }
       });
       const data = await response.json();
-      return res.status(200).json(data);
+      if (!response.ok) throw new Error(JSON.stringify(data));
+      return res.status(200).json(formatUsers(data));
     }
 
     if (req.method === 'POST') {
       const body = req.body || {};
-      const { action } = body;
+      const { action, cognome, newPin, vecchioCognome, nuovoCognome, is_admin, chiave, utenti, tipoAzione } = body;
 
-      // 1. Recupero Prenotazioni da Google Calendar
+      // Azione di lettura prenotazioni (consentita a tutti gli utenti autenticati)
       if (action === 'get-prenotazioni') {
-        if (!calendarId || !clientEmail || !privateKey) {
-          return res.status(200).json({});
-        }
+        if (!calendarId) return res.status(500).json({ error: 'GOOGLE_CALENDAR_ID non configurato' });
+        const accessToken = await getGoogleAccessToken();
 
-        try {
-          const jwtToken = await getGoogleJWT(clientEmail, privateKey);
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-          const timeMin = now.toISOString();
-          
-          const calRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&singleEvents=true&maxResults=250`, {
-            headers: { 'Authorization': `Bearer ${jwtToken}` }
-          });
-          const calData = await calRes.json();
-          
-          const mappaPrenotazioni = {};
-          if (calData && calData.items) {
-            calData.items.forEach(item => {
-              const summary = item.summary || '';
-              const description = item.description || '';
-              const startIso = item.start.dateTime || item.start.date;
-              
-              if (startIso) {
-                const datePart = startIso.split('T')[0];
-                const timePart = startIso.split('T')[1] ? startIso.split('T')[1].substring(0, 5) : '08:00';
-                const chiave = `${datePart}_${timePart}`;
-                
-                let utentiArray = [];
-                if (description) {
-                  utentiArray = description.split(',').map(u => u.trim()).filter(Boolean);
-                } else if (summary.includes(':')) {
-                  const parts = summary.split(':');
-                  if (parts[1]) utentiArray = parts[1].split('&').map(u => u.trim()).filter(Boolean);
-                }
-                
-                if (utentiArray.length > 0) {
-                  mappaPrenotazioni[chiave] = utentiArray;
-                }
+        const calRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?singleEvents=true`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        const calData = await calRes.json();
+        if (!calRes.ok) throw new Error(JSON.stringify(calData));
+
+        const prenotazioniGlobali = {};
+        if (calData.items) {
+          calData.items.forEach(item => {
+            if (item.description) {
+              const match = item.description.match(/chiave:\s*([^\n]+)/);
+              if (match && match[1]) {
+                const chiaveSlot = match[1].trim();
+                const utentiMatch = item.summary.replace('Tennis: ', '').split('&').map(s => s.trim()).filter(Boolean);
+                prenotazioniGlobali[chiaveSlot] = utentiMatch;
               }
-            });
-          }
-          return res.status(200).json(mappaPrenotazioni);
-        } catch (calErr) {
-          console.error('Errore lettura Google Calendar:', calErr);
-          return res.status(200).json({});
+            }
+          });
         }
+        return res.status(200).json(prenotazioniGlobali);
       }
 
-      // 2. Salvataggio / Modifica Prenotazione su Google Calendar
       if (action === 'save-prenotazione') {
-        const { chiave, utenti } = body;
+        if (!calendarId) return res.status(500).json({ error: 'GOOGLE_CALENDAR_ID non configurato' });
         if (!chiave) return res.status(400).json({ error: 'Chiave slot mancante' });
 
-        if (!calendarId || !clientEmail || !privateKey) {
-          return res.status(500).json({ error: 'Google Calendar non configurato' });
-        }
+        const accessToken = await getGoogleAccessToken();
+        const [dataIso, oraStr] = chiave.split('_');
+        const [ore] = oraStr.split(':');
+        
+        const startDateTime = `${dataIso}T${ore.padStart(2, '0')}:00:00+02:00`;
+        const endHour = parseInt(ore, 10) + 1;
+        const endDateTime = `${dataIso}T${String(endHour).padStart(2, '0')}:00:00+02:00`;
 
-        const [dateIso, oraInizio] = chiave.split('_');
-        const [ore] = oraInizio.split(':');
-        const oraFineNum = parseInt(ore) + 1;
-        const oraFine = (oraFineNum < 10 ? `0${oraFineNum}` : `${oraFineNum}`) + ':00';
-
-        const startDateTime = `${dateIso}T${oraInizio}:00Z`;
-        const endDateTime = `${dateIso}T${oraFine}:00Z`;
-        const jwtToken = await getGoogleJWT(clientEmail, privateKey);
-
-        const searchRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${dateIso}T00:00:00Z&timeMax=${dateIso}T23:59:59Z&singleEvents=true`, {
-          headers: { 'Authorization': `Bearer ${jwtToken}` }
+        const searchRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?singleEvents=true`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
         });
         const searchData = await searchRes.json();
-        
         let existingEventId = null;
-        if (searchData && searchData.items) {
-          const found = searchData.items.find(ev => {
-            const evStart = ev.start.dateTime || ev.start.date;
-            return evStart && evStart.includes(`${dateIso}T${oraInizio}`);
-          });
+
+        if (searchData.items) {
+          const found = searchData.items.find(item => item.description && item.description.includes(`chiave: ${chiave}`));
           if (found) existingEventId = found.id;
+        }
+
+        let logActionType = tipoAzione;
+        if (!logActionType) {
+          if (!utenti || utenti.length === 0) {
+            logActionType = 'CANCELLAZIONE';
+          } else if (utenti.length === 2) {
+            logActionType = 'UNIONE_DOPPIO';
+          } else {
+            logActionType = 'NUOVA_PRENOTAZIONE';
+          }
         }
 
         if (!utenti || utenti.length === 0) {
           if (existingEventId) {
             await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${existingEventId}`, {
               method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${jwtToken}` }
+              headers: { 'Authorization': `Bearer ${accessToken}` }
             });
           }
         } else {
-          const eventSummary = `Tennis: ${utenti.join(' & ')}`;
-          const eventDescription = utenti.join(', ');
+          const summary = `Tennis: ${utenti.join(' & ')}`;
+          const description = `Prenotazione campo da tennis.\nchiave: ${chiave}`;
+
           const eventBody = {
-            summary: eventSummary,
-            description: eventDescription,
+            summary,
+            description,
             start: { dateTime: startDateTime },
             end: { dateTime: endDateTime }
           };
@@ -140,7 +188,7 @@ export default async function handler(req, res) {
             await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${existingEventId}`, {
               method: 'PUT',
               headers: {
-                'Authorization': `Bearer ${jwtToken}`,
+                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify(eventBody)
@@ -149,7 +197,7 @@ export default async function handler(req, res) {
             await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${jwtToken}`,
+                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify(eventBody)
@@ -157,100 +205,79 @@ export default async function handler(req, res) {
           }
         }
 
+        await scriviLog(cognome || 'Utente', logActionType, { slot: chiave, utenti });
         return res.status(200).json({ success: true });
       }
 
-      // 3. Gestione Utenti (Base)
-      if (action === 'get-users') {
-        const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*`, {
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-          }
+      if (action === 'get-logs') {
+        const response = await fetch(`${supabaseUrl}/rest/v1/activity_logs?select=*&order=timestamp.desc&limit=100`, {
+          headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
         });
-        const users = await response.json();
-        
-        const { adminPin } = body;
-        const isMaster = (adminPin === '0000');
-        const adminFound = users.find(u => u.pin === adminPin && u.is_admin === true);
+        const data = await response.json();
+        return res.status(200).json(data);
+      }
 
-        if (!isMaster && !adminFound) {
-          return res.status(403).json({ error: 'Non autorizzato' });
-        }
-
-        return res.status(200).json(users);
+      if (action === 'get-users' || !action) {
+        const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*&order=cognome.asc`, {
+          headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+        });
+        const data = await response.json();
+        return res.status(200).json(formatUsers(data));
       }
 
       if (action === 'add') {
-        const { cognome, newPin } = body;
-        if (!cognome) return res.status(400).json({ error: 'Cognome obbligatorio' });
-
-        const pinDaUsare = newPin || Math.floor(1000 + Math.random() * 9000).toString();
-
-        const insertRes = await fetch(`${supabaseUrl}/rest/v1/utenti`, {
+        const generatedPin = newPin || Math.floor(1000 + Math.random() * 9000).toString();
+        const response = await fetch(`${supabaseUrl}/rest/v1/utenti`, {
           method: 'POST',
           headers: {
             'apikey': supabaseKey,
             'Authorization': `Bearer ${supabaseKey}`,
             'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
+            'Prefer': 'return=representation'
           },
-          body: JSON.stringify({
-            cognome: cognome.trim(),
-            pin: pinDaUsare,
-            is_admin: false,
-            quota_pagata: false,
-            anno_quota: new Date().getFullYear().toString()
-          })
+          body: JSON.stringify({ cognome, pin: generatedPin, is_admin: is_admin || false })
         });
-
-        if (!insertRes.ok) {
-          const err = await insertRes.json();
-          return res.status(400).json({ error: err.message || 'Errore inserimento utente' });
-        }
-
-        return res.status(200).json({ success: true, pin: pinDaUsare });
-      }
-
-      if (action === 'delete') {
-        const { cognome } = body;
-        if (!cognome || cognome.toLowerCase() === 'admin') {
-          return res.status(400).json({ error: 'Impossibile eliminare questo utente' });
-        }
-
-        const delRes = await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(cognome)}`, {
-          method: 'DELETE',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-          }
-        });
-
-        if (!delRes.ok) return res.status(400).json({ error: 'Errore durante l eliminazione' });
-        return res.status(200).json({ success: true });
+        await response.json();
+        await scriviLog('Admin', 'ADD_USER', { target: cognome });
+        return res.status(200).json({ success: true, message: `Utente ${cognome} aggiunto` });
       }
 
       if (action === 'reset-pin') {
-        const { cognome, newPin } = body;
-        if (!cognome || !newPin) return res.status(400).json({ error: 'Dati incompleti' });
-
-        const patchRes = await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(cognome)}`, {
+        const pinToSet = newPin || Math.floor(1000 + Math.random() * 9000).toString();
+        await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(cognome)}`, {
           method: 'PATCH',
           headers: {
             'apikey': supabaseKey,
             'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
+            'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ pin: newPin })
+          body: JSON.stringify({ pin: pinToSet })
         });
-
-        if (!patchRes.ok) return res.status(400).json({ error: 'Errore aggiornamento PIN' });
+        await scriviLog('Admin', 'RESET_OR_UPDATE_PIN', { target: cognome });
         return res.status(200).json({ success: true });
       }
 
-      if (action === 'get-logs') {
-        return res.status(200).json([]);
+      if (action === 'update-cognome') {
+        await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(vecchioCognome)}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ cognome: nuovoCognome })
+        });
+        await scriviLog('Admin', 'UPDATE_COGNOME', { vecchio: vecchioCognome, nuovo: nuovoCognome });
+        return res.status(200).json({ success: true });
+      }
+
+      if (action === 'delete') {
+        await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(cognome)}`, {
+          method: 'DELETE',
+          headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+        });
+        await scriviLog('Admin', 'DELETE_USER', { target: cognome });
+        return res.status(200).json({ success: true });
       }
 
       return res.status(400).json({ error: 'Azione non riconosciuta' });
@@ -259,37 +286,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Metodo non consentito' });
 
   } catch (err) {
-    console.error('Errore API Admin:', err);
-    return res.status(500).json({ error: err.message || 'Errore interno server' });
+    console.error('Errore backend:', err);
+    return res.status(500).json({ error: err.message || 'Errore interno' });
   }
-}
-
-async function getGoogleJWT(clientEmail, privateKey) {
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: clientEmail,
-    scope: 'https://www.googleapis.com/auth/calendar',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now
-  };
-
-  const base64UrlEncode = (str) => Buffer.from(str).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
-
-  const crypto = await import('crypto');
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(unsignedToken);
-  const signature = sign.sign(privateKey, 'base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-  const jwt = `${unsignedToken}.${signature}`;
-
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=authorization_assertion&assertion=${jwt}`
-  });
-  const tokenData = await tokenRes.json();
-  return tokenData.access_token;
 }
