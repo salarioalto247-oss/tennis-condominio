@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Pagamenti - Tennis Club Suvereto</title>
+    <!-- Tailwind CSS per uno stile pulito e moderno -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-50 min-h-screen p-6">
+
+    <!-- Area protetta (Visibile solo agli Admin) -->
+    <div id="admin-container" class="max-w-5xl mx-auto bg-white shadow-md rounded-lg p-6 hidden">
+        <header class="flex justify-between items-center border-b pb-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">💳 Gestione Pagamenti Tennis</h1>
+            <a href="index.html" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium transition">← Torna al Calendar</a>
+        </header>
+
+        <!-- Sezione di inserimento / controllo -->
+        <section class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h2 class="text-lg font-semibold text-blue-900 mb-2">Stato Sistema Pagamenti</h2>
+            <p class="text-blue-700 text-sm mb-4">Area riservata agli amministratori. Da qui è possibile monitorare e registrare le quote dei soci.</p>
+            <button onclick="caricaPagamenti()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition shadow-sm">
+                Aggiorna Lista Pagamenti
+            </button>
+        </section>
+
+        <!-- Tabella dei pagamenti -->
+        <section>
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Elenco Transazioni / Quote</h3>
+            <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-700 text-sm border-b">
+                            <th class="p-3 font-semibold"> Socio / Utente</th>
+                            <th class="p-3 font-semibold"> Importo</th>
+                            <th class="p-3 font-semibold"> Stato</th>
+                            <th class="p-3 font-semibold"> Data</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabella-pagamenti" class="divide-y divide-gray-200 text-sm text-gray-600">
+                        <tr>
+                            <td colspan="4" class="p-4 text-center text-gray-400">Nessun dato caricato. Clicca su "Aggiorna Lista Pagamenti".</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Schermata di blocco se non autorizzato -->
+    <div id="login-lock" class="max-w-md mx-auto mt-24 bg-white shadow-md rounded-lg p-8 text-center border border-gray-100">
+        <div class="text-red-500 text-4xl mb-3">🔒</div>
+        <h2 class="text-xl font-bold text-gray-800 mb-2">Accesso Riservato</h2>
+        <p class="text-gray-600 text-sm mb-6">Devi effettuare l'accesso come amministratore nella pagina principale (`index.html`) per visualizzare questa sezione.</p>
+        <a href="index.html" class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
+            Vai al Login / Home
+        </a>
+    </div>
+
+    <!-- Logica di autenticazione e chiamata API -->
+    <script>
+        // Controllo dei permessi di admin all'avvio della pagina
+        function checkAdminAccess() {
+            const isAdmin = localStorage.getItem('isAdmin') === 'true' || sessionStorage.getItem('isAdmin') === 'true';
+
+            if (isAdmin) {
+                document.getElementById('admin-container').classList.remove('hidden');
+                document.getElementById('login-lock').classList.add('hidden');
+                // Carica automaticamente i dati all'apertura se autorizzato
+                caricaPagamenti();
+            } else {
+                document.getElementById('admin-container').classList.add('hidden');
+                document.getElementById('login-lock').classList.remove('hidden');
+            }
+        }
+
+        // Funzione per recuperare i dati dall'API di backend
+        async function caricaPagamenti() {
+            const tbody = document.getElementById('tabella-pagamenti');
+            tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-blue-600 animate-pulse">Caricamento in corso...</td></tr>`;
+
+            try {
+                // Chiamata alla Serverless Function nella cartella /api
+                const response = await fetch('/api/pagamenti-api');
+                const risultato = await response.json();
+
+                if (risultato.success && risultato.data && risultato.data.length > 0) {
+                    tbody.innerHTML = '';
+                    risultato.data.forEach(item => {
+                        tbody.innerHTML += `
+                            <tr class="hover:bg-gray-50">
+                                <td class="p-3 font-medium text-gray-800">${item.utente || 'Socio'}</td>
+                                <td class="p-3">€ ${item.importo || '0.00'}</td>
+                                <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">${item.stato || 'Pagato'}</span></td>
+                                <td class="p-3 text-gray-500">${item.data || '-'}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">Nessun pagamento registrato al momento.</td></tr>`;
+                }
+            } catch (error) {
+                console.error("Errore nel recupero dei pagamenti:", error);
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500">Errore di connessione al server delle API.</td></tr>`;
+            }
+        }
+
+        // Esegue il controllo di sicurezza appena si carica la pagina
+        checkAdminAccess();
+    </script>
+</body>
+</html>
