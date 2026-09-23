@@ -4,15 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestione Pagamenti - Tennis Club Suvereto</title>
-    <!-- Tailwind CSS per uno stile pulito e moderno -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-gray-50 min-h-screen p-6">
 
     <!-- Area protetta (Visibile solo se loggati come Admin) -->
-    <div id="admin-container" class="max-w-5xl mx-auto bg-white shadow-md rounded-lg p-6 hidden">
+    <div id="admin-container" class="max-w-6xl mx-auto bg-white shadow-md rounded-lg p-6 hidden">
         <header class="flex justify-between items-center border-b pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">💳 Gestione Pagamenti Tennis</h1>
+            <h1 class="text-2xl font-bold text-gray-800">💳 Gestione Pagamenti e Quote Soci</h1>
             <div class="flex items-center gap-4">
                 <button onclick="eseguiLogout()" class="text-red-600 hover:underline text-sm font-medium">Esci / Logout</button>
                 <a href="index.html" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium transition">← Torna al Calendar</a>
@@ -20,29 +19,33 @@
         </header>
 
         <!-- Sezione di controllo -->
-        <section class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h2 class="text-lg font-semibold text-blue-900 mb-2">Stato Sistema Pagamenti</h2>
-            <p class="text-blue-700 text-sm mb-4">Area riservata agli amministratori.</p>
+        <section class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4 flex justify-between items-center">
+            <div>
+                <h2 class="text-lg font-semibold text-blue-900 mb-1">Stato Sistema Pagamenti</h2>
+                <p class="text-blue-700 text-sm">Modifica i campi delle quote e salva le variazioni per ciascun socio.</p>
+            </div>
             <button onclick="caricaPagamenti()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition shadow-sm">
-                Aggiorna Lista Utenti / Quote
+                Aggiorna Tabella
             </button>
         </section>
 
-        <!-- Tabella dei pagamenti / utenti -->
+        <!-- Tabella dei pagamenti editabile -->
         <section>
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Elenco Utenti e Quote</h3>
             <div class="overflow-x-auto border border-gray-200 rounded-lg">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-gray-100 text-gray-700 text-sm border-b">
-                            <th class="p-3 font-semibold">Socio / Utente</th>
-                            <th class="p-3 font-semibold">Importo Quota</th>
-                            <th class="p-3 font-semibold">Stato Pagamento</th>
+                            <th class="p-3 font-semibold">Socio</th>
+                            <th class="p-3 font-semibold">Quota Pagata (€)</th>
+                            <th class="p-3 font-semibold">Anno Quota</th>
+                            <th class="p-3 font-semibold">Data Pagamento</th>
+                            <th class="p-3 font-semibold">Attivo</th>
+                            <th class="p-3 font-semibold text-center">Azione</th>
                         </tr>
                     </thead>
                     <tbody id="tabella-pagamenti" class="divide-y divide-gray-200 text-sm text-gray-600">
                         <tr>
-                            <td colspan="3" class="p-4 text-center text-gray-400">Nessun dato caricato.</td>
+                            <td colspan="6" class="p-4 text-center text-gray-400">Caricamento in corso...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -54,7 +57,7 @@
     <div id="login-container" class="max-w-md mx-auto mt-24 bg-white shadow-md rounded-lg p-8 text-center border border-gray-100">
         <div class="text-blue-600 text-4xl mb-3">🔒</div>
         <h2 class="text-xl font-bold text-gray-800 mb-2">Accesso Amministratore</h2>
-        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN amministrativo per accedere ai pagamenti.</p>
+        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN amministrativo per accedere alla gestione quote.</p>
         
         <form onsubmit="gestisciLogin(event)" class="space-y-4">
             <input type="password" id="admin-pin" placeholder="Inserisci PIN" required
@@ -70,7 +73,6 @@
         </div>
     </div>
 
-    <!-- Logica di autenticazione e caricamento dati -->
     <script>
         function checkAccess() {
             const isAdmin = localStorage.getItem('isAdmin') === 'true';
@@ -108,13 +110,10 @@
 
                     if (userFound || isMaster) {
                         localStorage.setItem('isAdmin', 'true');
-                        // Salviamo temporaneamente il PIN admin in sessionStorage per poter ricaricare i dati protetti da /api/admin
-                        sessionStorage.setItem('temp_admin_pin', pinInput);
                         checkAccess();
                         return;
                     }
                 }
-                
                 errorEl.classList.remove('hidden');
             } catch (err) {
                 console.error('Errore di connessione:', err);
@@ -128,47 +127,92 @@
 
         function eseguiLogout() {
             localStorage.removeItem('isAdmin');
-            sessionStorage.removeItem('temp_admin_pin');
             checkAccess();
         }
 
         async function caricaPagamenti() {
             const tbody = document.getElementById('tabella-pagamenti');
-            tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-blue-600 animate-pulse">Caricamento dati soci in corso...</td></tr>`;
-
-            const adminPin = sessionStorage.getItem('temp_admin_pin') || '0000';
+            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-blue-600 animate-pulse">Caricamento dati soci in corso...</td></tr>`;
 
             try {
-                // Sfruttiamo l'endpoint /api/admin già esistente e funzionante per prelevare la lista utenti
-                const response = await fetch('/api/admin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminPin: adminPin, action: 'get-users' })
-                });
-                const utenti = await response.json();
+                const response = await fetch('/api/pagamenti-api');
+                const result = await response.json();
 
-                if (response.ok && Array.isArray(utenti) && utenti.length > 0) {
+                if (result.success && Array.isArray(result.data) && result.data.length > 0) {
                     tbody.innerHTML = '';
-                    utenti.forEach(u => {
-                        // Omettiamo rigorosamente PIN e flag admin per sicurezza, mostrando solo nome e dati descrittivi
+                    result.data.forEach((u, index) => {
+                        const cognomeSafe = u.cognome || '';
+                        const quotaPagata = u.quota_pagata !== undefined && u.quota_pagata !== null ? u.quota_pagata : '';
+                        const annoQuota = u.anno_quota || new Date().getFullYear();
+                        const dataPagamento = u.data_pagamento ? u.data_pagamento.split('T')[0] : '';
+                        const isAttivo = u.attivo !== false && u.attivo !== 'false';
+
                         tbody.innerHTML += `
-                            <tr class="hover:bg-gray-50">
-                                <td class="p-3 font-medium text-gray-800">${u.cognome || 'Socio'}</td>
-                                <td class="p-3 text-gray-600">€ 50.00</td>
-                                <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800">Da verificare</span></td>
+                            <tr class="hover:bg-gray-50" id="row-${index}">
+                                <td class="p-3 font-medium text-gray-800">${cognomeSafe}</td>
+                                <td class="p-3">
+                                    <input type="number" step="0.01" id="quota-${index}" value="${quotaPagata}" placeholder="0.00" class="w-28 px-2 py-1 border rounded text-sm">
+                                </td>
+                                <td class="p-3">
+                                    <input type="number" id="anno-${index}" value="${annoQuota}" placeholder="2026" class="w-20 px-2 py-1 border rounded text-sm">
+                                </td>
+                                <td class="p-3">
+                                    <input type="date" id="data-${index}" value="${dataPagamento}" class="px-2 py-1 border rounded text-sm">
+                                </td>
+                                <td class="p-3">
+                                    <select id="attivo-${index}" class="px-2 py-1 border rounded text-sm">
+                                        <option value="true" ${isAttivo ? 'selected' : ''}>Sì</option>
+                                        <option value="false" ${!isAttivo ? 'selected' : ''}>No</option>
+                                    </select>
+                                </td>
+                                <td class="p-3 text-center">
+                                    <button onclick="salvaQuota('${cognomeSafe}', ${index})" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition">
+                                        Salva
+                                    </button>
+                                </td>
                             </tr>
                         `;
                     });
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-500">Nessun utente trovato nel sistema.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-500">Nessun utente trovato nel sistema.</td></tr>`;
                 }
             } catch (error) {
                 console.error("Errore:", error);
-                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500">Errore di connessione al server.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500">Errore di connessione al server.</td></tr>`;
             }
         }
 
-        // Avvio controllo all'apertura
+        async function salvaQuota(cognome, index) {
+            const quota = document.getElementById(`quota-${index}`).value;
+            const anno = document.getElementById(`anno-${index}`).value;
+            const dataPagamento = document.getElementById(`data-${index}`).value;
+            const attivo = document.getElementById(`attivo-${index}`).value === 'true';
+
+            try {
+                const response = await fetch('/api/pagamenti-api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cognome: cognome,
+                        quota_pagata: quota ? parseFloat(quota) : null,
+                        anno_quota: anno ? parseInt(anno) : null,
+                        data_pagamento: dataPagamento || null,
+                        attivo: attivo
+                    })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert(`Dati salvati con successo per ${cognome}!`);
+                } else {
+                    alert(result.error || "Errore durante il salvataggio.");
+                }
+            } catch (err) {
+                console.error("Errore:", err);
+                alert("Errore di connessione durante il salvataggio.");
+            }
+        }
+
         checkAccess();
     </script>
 </body>
