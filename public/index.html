@@ -24,6 +24,7 @@
       max-width: 900px;
       margin: 20px auto;
       padding: 0 20px;
+      padding-bottom: 40px;
     }
     /* Modale Login */
     #login-modal {
@@ -183,6 +184,11 @@
     </div>
   </div>
 
+  <!-- Footer con Versione dell'App -->
+  <footer style="text-align: center; padding: 15px; color: #666; font-size: 12px; border-top: 1px solid #eee; background: #fff;">
+    Intercondominio Salario Alto - Versione App: <b>1.4.0</b>
+  </footer>
+
   <!-- Script Principale -->
   <script>
     let currentUser = null; 
@@ -203,7 +209,6 @@
         mostraModaleLogin();
       }
 
-      // Avvia il controllo periodico in background ogni 10 secondi
       avviaAutoRefresh();
     });
 
@@ -218,7 +223,7 @@
             await aggiornaVistaTabelloneSilenziosa();
           }
         }
-      }, 10000); // 10 secondi
+      }, 10000);
     }
 
     async function caricaPrenotazioniGoogle() {

@@ -18,7 +18,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Variabili d ambiente Supabase non configurate' });
   }
 
-  // Funzione d'appoggio per ottenere il Token di accesso Google Calendar via Service Account
   async function getGoogleAccessToken() {
     if (!serviceAccountJson) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON mancante');
     const sa = JSON.parse(serviceAccountJson);
@@ -52,7 +51,6 @@ export default async function handler(req, res) {
     return tokenData.access_token;
   }
 
-  // Funzione d'appoggio per scrivere i log su Supabase
   const scriviLog = async (userEmail, actionType, details) => {
     try {
       await fetch(`${supabaseUrl}/rest/v1/activity_logs`, {
@@ -98,9 +96,8 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const body = req.body || {};
-      const { action, cognome, pin, newPin, vecchioCognome, is_admin, chiave, utenti } = body;
+      const { action, cognome, pin, newPin, vecchioCognome, is_admin, chiave, utenti, tipoAzione } = body;
 
-      // Azione: Ottieni prenotazioni da Google Calendar
       if (action === 'get-prenotazioni') {
         if (!calendarId) return res.status(500).json({ error: 'GOOGLE_CALENDAR_ID non configurato' });
         const accessToken = await getGoogleAccessToken();
@@ -127,7 +124,6 @@ export default async function handler(req, res) {
         return res.status(200).json(prenotazioniGlobali);
       }
 
-      // Azione: Salva/Aggiorna prenotazione su Google Calendar
       if (action === 'save-prenotazione') {
         if (!calendarId) return res.status(500).json({ error: 'GOOGLE_CALENDAR_ID non configurato' });
         if (!chiave) return res.status(400).json({ error: 'Chiave slot mancante' });
@@ -149,6 +145,18 @@ export default async function handler(req, res) {
         if (searchData.items) {
           const found = searchData.items.find(item => item.description && item.description.includes(`chiave: ${chiave}`));
           if (found) existingEventId = found.id;
+        }
+
+        // Usa l'azione specifica passata dal frontend, oppure assegna un default intelligente
+        let logActionType = tipoAzione;
+        if (!logActionType) {
+          if (!utenti || utenti.length === 0) {
+            logActionType = 'CANCELLAZIONE';
+          } else if (utenti.length === 2) {
+            logActionType = 'UNIONE_DOPPIO';
+          } else {
+            logActionType = 'NUOVA_PRENOTAZIONE';
+          }
         }
 
         if (!utenti || utenti.length === 0) {
@@ -190,7 +198,7 @@ export default async function handler(req, res) {
           }
         }
 
-        await scriviLog(cognome || 'Utente', 'PRENOTAZIONE_CALENDAR', { slot: chiave, utenti });
+        await scriviLog(cognome || 'Utente', logActionType, { slot: chiave, utenti });
         return res.status(200).json({ success: true });
       }
 
