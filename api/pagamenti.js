@@ -17,10 +17,13 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'POST') {
       const body = req.body || {};
-      const { action, cognome, pagato, importo } = body;
+      const { action, cognome, quota_pagata, anno_quota, data_pagamento } = body;
 
       if (action === 'update-pagamento') {
         if (!cognome) return res.status(400).json({ error: 'Cognome mancante' });
+
+        const annoCorrente = anno_quota || new Date().getFullYear().toString();
+        const dataPagCorrente = data_pagamento !== undefined ? data_pagamento : (quota_pagata ? new Date().toISOString().split('T')[0] : null);
 
         const updateRes = await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(cognome)}`, {
           method: 'PATCH',
@@ -31,8 +34,9 @@ export default async function handler(req, res) {
             'Prefer': 'return=minimal'
           },
           body: JSON.stringify({ 
-            pagato: pagato === true || pagato === 'true',
-            importo_pagato: importo !== undefined ? parseFloat(importo) : 0
+            quota_pagata: quota_pagata === true || quota_pagata === 'true',
+            anno_quota: annoCorrente,
+            data_pagamento: dataPagCorrente
           })
         });
 
@@ -41,7 +45,7 @@ export default async function handler(req, res) {
           throw new Error(JSON.stringify(errData));
         }
 
-        return res.status(200).json({ success: true, message: `Stato pagamento aggiornato per ${cognome}` });
+        return res.status(200).json({ success: true, message: `Stato quota aggiornato per ${cognome}` });
       }
 
       return res.status(400).json({ error: 'Azione pagamento non riconosciuta' });

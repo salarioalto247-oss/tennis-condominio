@@ -22,7 +22,7 @@
       align-items: center;
     }
     .container {
-      max-width: 900px;
+      max-width: 1000px;
       margin: 20px auto;
       padding: 0 20px;
       padding-bottom: 40px;
@@ -43,7 +43,7 @@
       width: 300px;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .modal-content input, .admin-panel-input {
+    .modal-content input {
       width: 100%;
       padding: 10px;
       margin-top: 5px;
@@ -52,7 +52,7 @@
       border-radius: 4px;
       box-sizing: border-box;
     }
-    .modal-content button, .admin-btn {
+    .modal-content button {
       padding: 8px 12px;
       background: #0070f3;
       color: white;
@@ -60,7 +60,7 @@
       border-radius: 4px;
       cursor: pointer;
     }
-    .modal-content button:hover, .admin-btn:hover {
+    .modal-content button:hover {
       background: #0051a2;
     }
     #suggerimenti-list {
@@ -98,37 +98,6 @@
     .btn-yellow:hover {
       background-color: #b7791f !important;
     }
-    .btn-blue {
-      background-color: #3182ce !important;
-      color: white;
-      border: none;
-      padding: 5px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .btn-blue:hover {
-      background-color: #2b6cb0 !important;
-    }
-    .badge-pagato {
-      background-color: #38a169;
-      color: white;
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: bold;
-      cursor: pointer;
-      display: inline-block;
-    }
-    .badge-non-pagato {
-      background-color: #e53e3e;
-      color: white;
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: bold;
-      cursor: pointer;
-      display: inline-block;
-    }
   </style>
 </head>
 <body>
@@ -137,7 +106,7 @@
     <h2 style="margin: 0;">🎾 Intercondominio Salario Alto - Prenotazione Campo Tennis</h2>
     <div>
       <span id="logged-user-display" style="margin-right: 15px; font-weight: bold;"></span>
-      <button id="admin-panel-btn" onclick="toggleAdminPanel()" style="display: none; margin-right: 10px; padding: 8px 12px; background: #3182ce; color: white; border: none; border-radius: 4px; cursor: pointer;">Pannello Admin</button>
+      <a id="admin-panel-btn" href="pagamenti.html" style="display: none; margin-right: 10px; padding: 8px 12px; background: #3182ce; color: white; text-decoration: none; border-radius: 4px; font-size: 13px;">Pannello Pagamenti & Admin</a>
       <button id="change-pin-btn" class="btn-yellow" onclick="cambiaMioPin()" style="margin-right: 10px; display: inline-block;">Cambia PIN</button>
       <button id="logout-btn" class="btn-red" onclick="logoutUser()" style="display: inline-block;">Cambia Utente</button>
     </div>
@@ -161,54 +130,11 @@
   </div>
 
   <div class="container">
-    <div id="admin-gestion-panel" style="display: none; background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-      <h3 style="margin-top: 0; color: #2b6cb0;">⚙️ Console di Amministrazione & Quote</h3>
-      <p style="font-size: 13px; color: #666;">Gestisci gli utenti registrati, i PIN e monitora lo stato dei pagamenti annuali della quota campo.</p>
-      
-      <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-
-      <h4 style="margin-bottom: 10px;">Aggiungi Nuovo Utente</h4>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
-        <div style="flex: 2; min-width: 180px;">
-          <label style="font-size: 12px; font-weight: bold;">Cognome:</label>
-          <input type="text" id="admin-new-cognome" class="admin-panel-input" placeholder="Es. Bianchi">
-        </div>
-        <div style="flex: 1; min-width: 120px;">
-          <label style="font-size: 12px; font-weight: bold;">PIN (opzionale):</label>
-          <input type="text" id="admin-new-pin" class="admin-panel-input" placeholder="Generato se vuoto">
-        </div>
-        <div style="flex: 1; min-width: 100px;">
-          <label style="font-size: 12px; font-weight: bold;">Importo (€):</label>
-          <input type="number" id="admin-new-importo" class="admin-panel-input" placeholder="Es. 50">
-        </div>
-        <div style="display: flex; align-items: center; height: 38px; margin-bottom: 10px;">
-          <label style="font-size: 12px; font-weight: bold; margin-right: 5px; cursor: pointer;">
-            <input type="checkbox" id="admin-new-pagato" style="margin-right: 4px;"> Quota Pagata
-          </label>
-        </div>
-        <div>
-          <button class="admin-btn" onclick="aggiungiUtenteAdmin()" style="margin-bottom: 10px; height: 38px;">Aggiungi</button>
-        </div>
-      </div>
-      <p id="admin-action-msg" style="font-size: 12px; margin-top: 5px; font-weight: bold;"></p>
-
-      <h4 style="margin-top: 20px; margin-bottom: 10px;">Elenco Utenti e Stato Quote</h4>
-      <div id="admin-users-list" style="max-height: 280px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px;">
-        Caricamento utenti...
-      </div>
-
-      <h4 style="margin-top: 30px; margin-bottom: 10px;">📋 Registro Attività e Modifiche (Audit Log)</h4>
-      <button class="btn-blue" onclick="caricaLogAdmin()" style="margin-bottom: 10px; font-size: 11px;">Aggiorna Log</button>
-      <div id="admin-logs-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px; background: #fafafa; font-size: 12px; font-family: monospace;">
-        Clicca su "Aggiorna Log" per caricare la cronologia.
-      </div>
-    </div>
-
     <div id="tabellone-container"></div>
   </div>
 
-  <footer style="text-align: center; padding: 15px; color: #666; font-size: 12px; border-top: 1px solid #eee; background: #fff;">
-    Intercondominio Salario Alto - Versione App: <b>1.4.1</b>
+  <footer style="text-align: center; padding: 15px; color: #666; font-size: 12px; border-top: 1px solid #eee; background: #fff; margin-top: 40px;">
+    Intercondominio Salario Alto - Versione App: <b>1.5.0</b>
   </footer>
 
   <script>
@@ -447,8 +373,6 @@
       localStorage.removeItem('tennis_pin');
       currentUser = null;
       prenotazioniPrecedenti = {};
-      const adminPanel = document.getElementById('admin-gestion-panel');
-      if (adminPanel) adminPanel.style.display = 'none';
       mostraModaleLogin();
     }
 
@@ -502,277 +426,13 @@
       }
     }
 
-    function toggleAdminPanel() {
-      if (!currentUser || !currentUser.isAdmin) return;
-      const panel = document.getElementById('admin-gestion-panel');
-      if (!panel) return;
-      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-      if (panel.style.display === 'block') {
-        caricaListaUtentiAdmin();
-        caricaLogAdmin();
-      }
-    }
-
-    async function caricaListaUtentiAdmin() {
-      try {
-        const res = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminPin: currentUser.pin, action: 'get-users' })
-        });
-        const users = await res.json();
-        if (res.ok && Array.isArray(users)) {
-          listaUtentiCache = users;
-          let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
-          html += '<tr style="background: #f4f4f4; text-align: left;"><th style="padding: 6px; border: 1px solid #ddd;">Cognome</th><th style="padding: 6px; border: 1px solid #ddd;">PIN</th><th style="padding: 6px; border: 1px solid #ddd;">Quota Pagata</th><th style="padding: 6px; border: 1px solid #ddd; text-align: center;">Azioni</th></tr>';
-          
-          users.forEach(u => {
-            const isMasterAdmin = u.cognome.toLowerCase() === 'admin';
-            const pagatoStatus = u.pagato === true || u.pagato === 'true';
-            const importoVal = u.importo_pagato ? ` (€${u.importo_pagato})` : '';
-
-            html += `
-              <tr>
-                <td style="padding: 6px; border: 1px solid #ddd;">
-                  <b>${u.cognome}</b> ${u.is_admin ? '<span style="color:green;">(Admin)</span>' : ''}
-                  ${!isMasterAdmin ? `<div style="margin-top: 4px;"><button class="btn-blue" onclick="modificaCognomeAdmin('${u.cognome}')" style="font-size: 10px; padding: 2px 5px;">Modifica Nome</button></div>` : ''}
-                </td>
-                <td style="padding: 6px; border: 1px solid #ddd;">
-                  ${u.pin}
-                  ${!isMasterAdmin ? `<div style="margin-top: 4px;"><button class="btn-blue" onclick="modificaPinAdmin('${u.cognome}', '${u.pin}')" style="font-size: 10px; padding: 2px 5px;">Modifica PIN</button></div>` : ''}
-                </td>
-                <td style="padding: 6px; border: 1px solid #ddd;">
-                  <span class="${pagatoStatus ? 'badge-pagato' : 'badge-non-pagato'}" onclick="toggleStatoPagamentoAdmin('${u.cognome}', ${pagatoStatus})" title="Clicca per invertire stato">
-                    ${pagatoStatus ? 'Pagato' + importoVal : 'Da pagare'}
-                  </span>
-                </td>
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center; white-space: nowrap;">
-                  ${!isMasterAdmin ? `<button class="btn-red" onclick="eliminaUtenteAdmin('${u.cognome}')" style="font-size: 11px; padding: 4px 8px;">Elimina</button>` : '<span style="color: #888; font-size: 11px;">Protetto</span>'}
-                </td>
-              </tr>
-            `;
-          });
-          html += '</table>';
-          const usersListEl = document.getElementById('admin-users-list');
-          if (usersListEl) usersListEl.innerHTML = html;
-        }
-      } catch (e) {
-        console.error('Errore lista utenti admin', e);
-      }
-    }
-
-    async function toggleStatoPagamentoAdmin(cognome, statoAttuale) {
-      const nuovoStato = !statoAttuale;
-      const importoStr = nuovoStato ? prompt("Inserisci l'importo pagato (es. 50):", "50") : "0";
-      if (nuovoStato && importoStr === null) return;
-
-      try {
-        const res = await fetch('/api/pagamenti', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'update-pagamento',
-            cognome: cognome,
-            pagato: nuovoStato,
-            importo: importoStr ? parseFloat(importoStr) : 0
-          })
-        });
-
-        if (res.ok) {
-          caricaListaUtentiAdmin();
-        } else {
-          alert("Errore durante l'aggiornamento del pagamento.");
-        }
-      } catch (e) {
-        console.error(e);
-        alert("Errore di connessione.");
-      }
-    }
-
-    async function aggiungiUtenteAdmin() {
-      const cognome = document.getElementById('admin-new-cognome').value.trim();
-      const pin = document.getElementById('admin-new-pin').value.trim();
-      const pagatoCheckbox = document.getElementById('admin-new-pagato');
-      const importoInput = document.getElementById('admin-new-importo');
-      const msgEl = document.getElementById('admin-action-msg');
-
-      if (!cognome) {
-        msgEl.style.color = 'red';
-        msgEl.textContent = 'Inserisci un cognome valido.';
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminPin: currentUser.pin,
-            action: 'add',
-            cognome: cognome,
-            newPin: pin || undefined
-          })
-        });
-        const data = await res.json();
-        
-        if (res.ok) {
-          const isPagato = pagatoCheckbox ? pagatoCheckbox.checked : false;
-          const importoVal = importoInput ? (importoInput.value || '0') : '0';
-
-          await fetch('/api/pagamenti', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'update-pagamento',
-              cognome: cognome,
-              pagato: isPagato,
-              importo: importoVal
-            })
-          });
-
-          msgEl.style.color = 'green';
-          msgEl.textContent = `Utente ${cognome} aggiunto con successo!`;
-          document.getElementById('admin-new-cognome').value = '';
-          document.getElementById('admin-new-pin').value = '';
-          if (pagatoCheckbox) pagatoCheckbox.checked = false;
-          if (importoInput) importoInput.value = '';
-          
-          caricaListaUtentiAdmin();
-          caricaLogAdmin();
-          scaricaListaUtentiPerAutocheck();
-        } else {
-          msgEl.style.color = 'red';
-          msgEl.textContent = data.error || 'Errore durante l aggiunta.';
-        }
-      } catch (e) {
-        console.error(e);
-        msgEl.style.color = 'red';
-        msgEl.textContent = 'Errore di connessione.';
-      }
-    }
-
-    async function caricaLogAdmin() {
-      const logsListEl = document.getElementById('admin-logs-list');
-      if (!logsListEl) return;
-      logsListEl.innerHTML = 'Caricamento log...';
-
-      try {
-        const res = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminPin: currentUser.pin, action: 'get-logs' })
-        });
-        const logs = await res.json();
-        if (res.ok && Array.isArray(logs)) {
-          if (logs.length === 0) {
-            logsListEl.innerHTML = 'Nessuna attività registrata.';
-            return;
-          }
-          let html = '<table style="width: 100%; border-collapse: collapse; font-size: 11px;">';
-          html += '<tr style="background: #eee;"><th style="padding: 4px; border: 1px solid #ddd;">Data/Ora</th><th style="padding: 4px; border: 1px solid #ddd;">Utente</th><th style="padding: 4px; border: 1px solid #ddd;">Azione</th><th style="padding: 4px; border: 1px solid #ddd;">Dettagli</th></tr>';
-          
-          logs.forEach(l => {
-            const dataFormattata = new Date(l.timestamp).toLocaleString('it-IT');
-            html += `
-              <tr>
-                <td style="padding: 4px; border: 1px solid #ddd; white-space: nowrap;">${dataFormattata}</td>
-                <td style="padding: 4px; border: 1px solid #ddd;"><b>${l.user_email || 'N.D.'}</b></td>
-                <td style="padding: 4px; border: 1px solid #ddd; color: #2b6cb0;">${l.action}</td>
-                <td style="padding: 4px; border: 1px solid #ddd;">${JSON.stringify(l.metadata || {})}</td>
-              </tr>
-            `;
-          });
-          html += '</table>';
-          logsListEl.innerHTML = html;
-        }
-      } catch (e) {
-        console.error(e);
-        logsListEl.innerHTML = '<span style="color: red;">Errore caricamento log.</span>';
-      }
-    }
-
-    async function modificaCognomeAdmin(vecchioCognome) {
-      const nuovoCognome = prompt(`Nuovo cognome per ${vecchioCognome}:`, vecchioCognome);
-      if (nuovoCognome === null || !nuovoCognome.trim()) return;
-
-      try {
-        const res = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminPin: currentUser.pin,
-            action: 'update-cognome',
-            vecchioCognome: vecchioCognome,
-            nuovoCognome: nuovoCognome.trim()
-          })
-        });
-        if (res.ok) {
-          caricaListaUtentiAdmin();
-          scaricaListaUtentiPerAutocheck();
-        } else {
-          alert("Errore durante la modifica.");
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    async function modificaPinAdmin(cognome, pinAttuale) {
-      const nuovoPin = prompt(`Nuovo PIN per ${cognome}:`, pinAttuale);
-      if (nuovoPin === null || !nuovoPin.trim()) return;
-
-      try {
-        const res = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminPin: currentUser.pin,
-            action: 'reset-pin',
-            cognome: cognome,
-            newPin: nuovoPin.trim()
-          })
-        });
-        if (res.ok) {
-          caricaListaUtentiAdmin();
-        } else {
-          alert("Errore durante la modifica del PIN.");
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    async function eliminaUtenteAdmin(cognome) {
-      if (!confirm(`Eliminare l'utente ${cognome}?`)) return;
-
-      try {
-        const res = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminPin: currentUser.pin,
-            action: 'delete',
-            cognome: cognome
-          })
-        });
-        if (res.ok) {
-          caricaListaUtentiAdmin();
-          scaricaListaUtentiPerAutocheck();
-        } else {
-          alert("Errore durante l'eliminazione.");
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
     async function caricaTabellone() {
       await caricaPrenotazioniGoogle();
       await aggiornaVistaTabelloneSilenziosa();
     }
 
     async function aggiornaVistaTabelloneSilenziosa() {
-      const container = document.getElementById('tabellone-container') || document.querySelector('.container');
+      const container = document.getElementById('tabellone-container');
       if (!container) return;
       
       let tabelloneDiv = document.getElementById('tabellone-orari-griglia');
@@ -924,14 +584,14 @@
         } else {
           if (confirm(`Vuoi cancellare la tua prenotazione del ${dataIso} alle ${ora}?`)) {
             let rimosso = false;
-            const nuovi = utentiSlot.filter(u => {
+            const novos = utentiSlot.filter(u => {
               if (!rimosso && u.toLowerCase() === currentUser.cognome.toLowerCase()) {
                 rimosso = true;
                 return false;
               }
               return true;
             });
-            await salvaPrenotazioneGoogle(chiaveSlot, nuovi, 'CANCELLAZIONE');
+            await salvaPrenotazioneGoogle(chiaveSlot, novos, 'CANCELLAZIONE');
             await caricaTabellone();
           }
         }
