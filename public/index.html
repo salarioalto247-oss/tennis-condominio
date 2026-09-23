@@ -188,6 +188,7 @@
     let currentUser = null; 
     let listaUtentiCache = [];
     let prenotazioniGlobali = {}; 
+    let prenotazioniPrecedenti = {};
     let refreshInterval = null;
 
     window.addEventListener('DOMContentLoaded', async () => {
@@ -232,13 +233,42 @@
         });
         const data = await response.json();
         if (response.ok && data) {
+          // Se abbiamo già uno storico precedente, controlla se qualcuno si è unito ai nostri slot
+          if (currentUser && Object.keys(prenotazioniPrecedenti).length > 0) {
+            verificaNuoviCompagni(data);
+          }
           prenotazioniGlobali = data;
+          prenotazioniPrecedenti = JSON.parse(JSON.stringify(data));
         } else {
           prenotazioniGlobali = {};
         }
       } catch (e) {
         console.error('Errore caricamento prenotazioni da Google Calendar:', e);
         prenotazioniGlobali = {};
+      }
+    }
+
+    function verificaNuoviCompagni(nuovePrenotazioni) {
+      if (!currentUser || currentUser.isAdmin) return;
+      const nomeMio = currentUser.cognome.toLowerCase();
+
+      for (let chiave in nuovePrenotazioni) {
+        const slotNuovo = nuovePrenotazioni[chiave] || [];
+        const slotVecchio = prenotazioniPrecedenti[chiave] || [];
+
+        // Controlla se noi eravamo presenti nello slot nel ciclo precedente
+        const eroPresentePrima = slotVecchio.some(u => u.toLowerCase() === nomeMio);
+        
+        if (eroPresentePrima) {
+          // Se il numero di utenti è aumentato, significa che qualcuno si è aggiunto
+          if (slotNuovo.length > slotVecchio.length) {
+            const nuoviUtenti = slotNuovo.filter(u => !slotVecchio.some(v => v.toLowerCase() === u.toLowerCase()));
+            if (nuoviUtenti.length > 0) {
+              const [dataIso, ora] = chiave.split('_');
+              alert(`🎾 Notifica Doppio: L'utente "${nuoviUtenti.join(', ')}" si è unito alla tua prenotazione del giorno ${dataIso} alle ore ${ora}! Adesso lo slot è per il doppio.`);
+            }
+          }
+        }
       }
     }
 
@@ -408,6 +438,7 @@
       localStorage.removeItem('tennis_user');
       localStorage.removeItem('tennis_pin');
       currentUser = null;
+      prenotazioniPrecedenti = {};
       const adminPanel = document.getElementById('admin-gestion-panel');
       if (adminPanel) adminPanel.style.display = 'none';
       mostraModaleLogin();
@@ -424,19 +455,19 @@
         return;
       }
 
-      const nuovoPin1 = prompt("Inserisci il nuovo PIN desiderato (almeno 4 caratteri o numeri):");
-      if (nuovoPin1 === null) return;
-      const pinFinale = nuovoPin1.trim();
+      const nuevoPin1 = prompt("Inserisci il nuovo PIN desiderato (almeno 4 caratteri o numeri):");
+      if (nuevoPin1 === null) return;
+      const pinFinale = nuevoPin1.trim();
 
       if (!pinFinale || pinFinale.length < 3) {
         alert("Il nuovo PIN non è valido o è troppo corto.");
         return;
       }
 
-      const nuovoPin2 = prompt("Conferma il nuovo PIN:");
-      if (nuovoPin2 === null) return;
+      const nuevoPin2 = prompt("Conferma il nuovo PIN:");
+      if (nuevoPin2 === null) return;
 
-      if (pinFinale !== nuovoPin2.trim()) {
+      if (pinFinale !== nuevoPin2.trim()) {
         alert("I PIN inseriti non coincidono.");
         return;
       }
@@ -791,7 +822,6 @@
         }
         
         ore.forEach(ora => {
-          // Calcola l'orario di fine (es. 08:00 -> 09:00)
           const [hNum] = ora.split(':');
           const hNext = parseInt(hNum, 10) + 1;
           const oraFine = hNext < 10 ? `0${hNext}:00` : `${hNext}:00`;
@@ -936,8 +966,8 @@
             await caricaTabellone();
           } else {
             const nuoviUtenti = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti);
+            prenotazioniGlobali[chiaveSlot] = novosUtenti;
+            await salvaPrenotazioneGoogle(chiaveSlot, novosUtenti);
             await caricaTabellone();
           }
         } else {
