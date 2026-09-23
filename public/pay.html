@@ -8,7 +8,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen p-6">
 
-    <!-- Area protetta (Visibile solo se loggati come Admin) -->
+    <!-- Area protetta -->
     <div id="admin-container" class="max-w-6xl mx-auto bg-white shadow-md rounded-lg p-6 hidden">
         <header class="flex justify-between items-center border-b pb-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800">💳 Gestione Pagamenti e Quote Soci</h1>
@@ -18,28 +18,26 @@
             </div>
         </header>
 
-        <!-- Sezione di controllo -->
         <section class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4 flex justify-between items-center">
             <div>
                 <h2 class="text-lg font-semibold text-blue-900 mb-1">Stato Sistema Pagamenti</h2>
-                <p class="text-blue-700 text-sm">Modifica i campi delle quote e salva le variazioni per ciascun socio.</p>
+                <p class="text-blue-700 text-sm">Gestisci lo stato delle quote (Vero/Falso). L'attivo si aggiorna automaticamente per l'anno in corso (2026).</p>
             </div>
             <button onclick="caricaPagamenti()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition shadow-sm">
                 Aggiorna Tabella
             </button>
         </section>
 
-        <!-- Tabella dei pagamenti editabile -->
         <section>
             <div class="overflow-x-auto border border-gray-200 rounded-lg">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-gray-100 text-gray-700 text-sm border-b">
                             <th class="p-3 font-semibold">Socio</th>
-                            <th class="p-3 font-semibold">Quota Pagata (€)</th>
+                            <th class="p-3 font-semibold">Quota Pagata</th>
                             <th class="p-3 font-semibold">Anno Quota</th>
                             <th class="p-3 font-semibold">Data Pagamento</th>
-                            <th class="p-3 font-semibold">Attivo</th>
+                            <th class="p-3 font-semibold">Attivo (Auto)</th>
                             <th class="p-3 font-semibold text-center">Azione</th>
                         </tr>
                     </thead>
@@ -53,11 +51,11 @@
         </section>
     </div>
 
-    <!-- Schermata di Login con PIN -->
+    <!-- Login -->
     <div id="login-container" class="max-w-md mx-auto mt-24 bg-white shadow-md rounded-lg p-8 text-center border border-gray-100">
         <div class="text-blue-600 text-4xl mb-3">🔒</div>
         <h2 class="text-xl font-bold text-gray-800 mb-2">Accesso Amministratore</h2>
-        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN amministrativo per accedere alla gestione quote.</p>
+        <p class="text-gray-600 text-sm mb-6">Inserisci il PIN amministrativo.</p>
         
         <form onsubmit="gestisciLogin(event)" class="space-y-4">
             <input type="password" id="admin-pin" placeholder="Inserisci PIN" required
@@ -65,15 +63,17 @@
             <button type="submit" id="btn-accedi" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
                 Accedi
             </button>
-            <p id="login-error" class="text-red-500 text-xs hidden">PIN non valido o non amministratore.</p>
+            <p id="login-error" class="text-red-500 text-xs hidden">PIN non valido.</p>
         </form>
         
         <div class="mt-6 border-t pt-4">
-            <a href="index.html" class="text-blue-600 hover:underline text-sm font-medium">← Torna alla Home / Calendar</a>
+            <a href="index.html" class="text-blue-600 hover:underline text-sm font-medium">← Torna alla Home</a>
         </div>
     </div>
 
     <script>
+        const ANNO_CORRENTE = new Date().getFullYear(); // 2026
+
         function checkAccess() {
             const isAdmin = localStorage.getItem('isAdmin') === 'true';
             if (isAdmin) {
@@ -116,8 +116,7 @@
                 }
                 errorEl.classList.remove('hidden');
             } catch (err) {
-                console.error('Errore di connessione:', err);
-                errorEl.textContent = 'Errore di connessione al server';
+                errorEl.textContent = 'Errore di connessione';
                 errorEl.classList.remove('hidden');
             } finally {
                 btnAccedi.textContent = 'Accedi';
@@ -132,7 +131,7 @@
 
         async function caricaPagamenti() {
             const tbody = document.getElementById('tabella-pagamenti');
-            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-blue-600 animate-pulse">Caricamento dati soci in corso...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-blue-600 animate-pulse">Caricamento dati soci...</td></tr>`;
 
             try {
                 const response = await fetch('/api/pagamenti-api');
@@ -142,28 +141,34 @@
                     tbody.innerHTML = '';
                     result.data.forEach((u, index) => {
                         const cognomeSafe = u.cognome || '';
-                        const quotaPagata = u.quota_pagata !== undefined && u.quota_pagata !== null ? u.quota_pagata : '';
-                        const annoQuota = u.anno_quota || new Date().getFullYear();
+                        
+                        // Quota pagata booleana (true/false)
+                        const quotaPagata = u.quota_pagata === true || u.quota_pagata === 'true';
+                        const annoQuota = u.anno_quota || ANNO_CORRENTE;
                         const dataPagamento = u.data_pagamento ? u.data_pagamento.split('T')[0] : '';
-                        const isAttivo = u.attivo !== false && u.attivo !== 'false';
+
+                        // Calcolo automatico di "attivo": "si" se quota è true e l'anno è quello in corso
+                        const isAttivoAuto = quotaPagata && (parseInt(annoQuota, 10) === ANNO_CORRENTE);
+                        const testoAttivo = isAttivoAuto ? 'Sì' : 'No';
+                        const badgeColor = isAttivoAuto ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
 
                         tbody.innerHTML += `
                             <tr class="hover:bg-gray-50" id="row-${index}">
                                 <td class="p-3 font-medium text-gray-800">${cognomeSafe}</td>
                                 <td class="p-3">
-                                    <input type="number" step="0.01" id="quota-${index}" value="${quotaPagata}" placeholder="0.00" class="w-28 px-2 py-1 border rounded text-sm">
+                                    <select id="quota-${index}" onchange="aggiornaStatoAttivo(${index})" class="px-2 py-1 border rounded text-sm font-medium">
+                                        <option value="true" ${quotaPagata ? 'selected' : ''}>Vero (Pagata)</option>
+                                        <option value="false" ${!quotaPagata ? 'selected' : ''}>Falso (Non pagata)</option>
+                                    </select>
                                 </td>
                                 <td class="p-3">
-                                    <input type="number" id="anno-${index}" value="${annoQuota}" placeholder="2026" class="w-20 px-2 py-1 border rounded text-sm">
+                                    <input type="number" id="anno-${index}" value="${annoQuota}" oninput="aggiornaStatoAttivo(${index})" placeholder="2026" class="w-20 px-2 py-1 border rounded text-sm">
                                 </td>
                                 <td class="p-3">
                                     <input type="date" id="data-${index}" value="${dataPagamento}" class="px-2 py-1 border rounded text-sm">
                                 </td>
                                 <td class="p-3">
-                                    <select id="attivo-${index}" class="px-2 py-1 border rounded text-sm">
-                                        <option value="true" ${isAttivo ? 'selected' : ''}>Sì</option>
-                                        <option value="false" ${!isAttivo ? 'selected' : ''}>No</option>
-                                    </select>
+                                    <span id="badge-attivo-${index}" class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeColor}">${testoAttivo}</span>
                                 </td>
                                 <td class="p-3 text-center">
                                     <button onclick="salvaQuota('${cognomeSafe}', ${index})" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition">
@@ -174,19 +179,30 @@
                         `;
                     });
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-500">Nessun utente trovato nel sistema.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-500">Nessun utente trovato.</td></tr>`;
                 }
             } catch (error) {
-                console.error("Errore:", error);
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500">Errore di connessione al server.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500">Errore di connessione.</td></tr>`;
             }
         }
 
+        // Funzione per aggiornare in tempo reale la visualizzazione del campo "Attivo" mentre l'utente cambia i campi
+        function aggiornaStatoAttivo(index) {
+            const quotaVal = document.getElementById(`quota-${index}`).value === 'true';
+            const annoVal = parseInt(document.getElementById(`anno-${index}`).value, 10);
+            const badgeEl = document.getElementById(`badge-attivo-${index}`);
+
+            const attivo = quotaVal && (annoVal === ANNO_CORRENTE);
+
+            badgeEl.textContent = attivo ? 'Sì' : 'No';
+            badgeEl.className = `px-2.5 py-1 rounded-full text-xs font-bold ${attivo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+        }
+
         async function salvaQuota(cognome, index) {
-            const quota = document.getElementById(`quota-${index}`).value;
+            const quota = document.getElementById(`quota-${index}`).value === 'true';
             const anno = document.getElementById(`anno-${index}`).value;
             const dataPagamento = document.getElementById(`data-${index}`).value;
-            const attivo = document.getElementById(`attivo-${index}`).value === 'true';
+            const attivo = quota && (parseInt(anno, 10) === ANNO_CORRENTE); // Calcolato automaticamente
 
             try {
                 const response = await fetch('/api/pagamenti-api', {
@@ -194,8 +210,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         cognome: cognome,
-                        quota_pagata: quota ? parseFloat(quota) : null,
-                        anno_quota: anno ? parseInt(anno) : null,
+                        quota_pagata: quota,
+                        anno_quota: anno ? parseInt(anno, 10) : null,
                         data_pagamento: dataPagamento || null,
                         attivo: attivo
                     })
@@ -204,11 +220,11 @@
                 const result = await response.json();
                 if (response.ok) {
                     alert(`Dati salvati con successo per ${cognome}!`);
+                    caricaPagamenti();
                 } else {
                     alert(result.error || "Errore durante il salvataggio.");
                 }
             } catch (err) {
-                console.error("Errore:", err);
                 alert("Errore di connessione durante il salvataggio.");
             }
         }

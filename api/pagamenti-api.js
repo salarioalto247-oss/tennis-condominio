@@ -15,7 +15,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        // GET: Legge la lista degli utenti con i campi relativi ai pagamenti
+        const ANNO_CORRENTE = new Date().getFullYear();
+
         if (req.method === 'GET') {
             const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=cognome,quota_pagata,anno_quota,data_pagamento,attivo&order=cognome.asc`, {
                 headers: {
@@ -28,19 +29,22 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: true, data });
         }
 
-        // POST: Aggiorna i campi di pagamento per uno specifico socio
         if (req.method === 'POST') {
-            const { cognome, quota_pagata, anno_quota, data_pagamento, attivo } = req.body || {};
+            const { cognome, quota_pagata, anno_quota, data_pagamento } = req.body || {};
 
             if (!cognome) {
                 return res.status(400).json({ error: 'Cognome non specificato' });
             }
 
-            const updatePayload = {};
-            if (quota_pagata !== undefined) updatePayload.quota_pagata = quota_pagata;
-            if (anno_quota !== undefined) updatePayload.anno_quota = anno_quota;
-            if (data_pagamento !== undefined) updatePayload.data_pagamento = data_pagamento;
-            if (attivo !== undefined) updatePayload.attivo = attivo;
+            // Calcolo automatico di attivo nel backend (sicurezza extra)
+            const attivoAuto = (quota_pagata === true) && (parseInt(anno_quota, 10) === ANNO_CORRENTE);
+
+            const updatePayload = {
+                quota_pagata: Boolean(quota_pagata),
+                anno_quota: anno_quota !== undefined ? anno_quota : null,
+                data_pagamento: data_pagamento || null,
+                attivo: attivoAuto
+            };
 
             const updateRes = await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(cognome)}`, {
                 method: 'PATCH',
