@@ -51,8 +51,16 @@ export default async function handler(req, res) {
     return tokenData.access_token;
   }
 
+  // Funzione di scrittura log aggiornata con cattura e salvataggio dell'IP
   const scriviLog = async (userEmail, actionType, details) => {
     try {
+      const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : 'N.D.';
+      
+      const metadataConIp = {
+        ...details,
+        ip_dispositivo: clientIp
+      };
+
       await fetch(`${supabaseUrl}/rest/v1/activity_logs`, {
         method: 'POST',
         headers: {
@@ -64,8 +72,8 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           user_email: userEmail || 'Amministratore',
           action: actionType,
-          ip_address: req.headers['x-forwarded-for'] || 'N.D.',
-          metadata: details
+          ip_address: clientIp,
+          metadata: metadataConIp
         })
       });
     } catch (e) {
@@ -147,7 +155,6 @@ export default async function handler(req, res) {
           if (found) existingEventId = found.id;
         }
 
-        // Usa l'azione specifica passata dal frontend, oppure assegna un default intelligente
         let logActionType = tipoAzione;
         if (!logActionType) {
           if (!utenti || utenti.length === 0) {
