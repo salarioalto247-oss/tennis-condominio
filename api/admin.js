@@ -10,7 +10,6 @@ export default async function handler(req, res) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-  // Credenziali Google Calendar (se configurate nelle variabili d'ambiente)
   const calendarId = process.env.GOOGLE_CALENDAR_ID;
   const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
   let privateKey = process.env.GOOGLE_PRIVATE_KEY;
@@ -23,7 +22,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // GET: Restituisce la lista di tutti gli utenti registrati
     if (req.method === 'GET') {
       const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*`, {
         headers: {
@@ -39,10 +37,8 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const { action } = body;
 
-      // 1. Recupero Prenotazioni da Google Calendar
       if (action === 'get-prenotazioni') {
         if (!calendarId || !clientEmail || !privateKey) {
-          // Fallback se Calendar non è configurato
           return res.status(200).json({});
         }
 
@@ -90,9 +86,8 @@ export default async function handler(req, res) {
         }
       }
 
-      // 2. Salvataggio / Modifica Prenotazione su Google Calendar
       if (action === 'save-prenotazione') {
-        const { chiave, utenti, tipoAzione, cognome } = body;
+        const { chiave, utenti } = body;
         if (!chiave) return res.status(400).json({ error: 'Chiave slot mancante' });
 
         if (!calendarId || !clientEmail || !privateKey) {
@@ -108,7 +103,6 @@ export default async function handler(req, res) {
         const endDateTime = `${dateIso}T${oraFine}:00Z`;
         const jwtToken = await getGoogleJWT(clientEmail, privateKey);
 
-        // Cerca se esiste già un evento in questo slot
         const searchRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${dateIso}T00:00:00Z&timeMax=${dateIso}T23:59:59Z&singleEvents=true`, {
           headers: { 'Authorization': `Bearer ${jwtToken}` }
         });
@@ -124,7 +118,6 @@ export default async function handler(req, res) {
         }
 
         if (!utenti || utenti.length === 0) {
-          // Cancella evento se lo slot è vuoto
           if (existingEventId) {
             await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${existingEventId}`, {
               method: 'DELETE',
@@ -132,7 +125,6 @@ export default async function handler(req, res) {
             });
           }
         } else {
-          // Crea o aggiorna evento
           const eventSummary = `Tennis: ${utenti.join(' & ')}`;
           const eventDescription = utenti.join(', ');
           const eventBody = {
@@ -166,31 +158,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
       }
 
-      // 3. Azione di Toggle Attivo / Disattivo Account
-      if (action === 'toggle-attivo') {
-        const { cognome, attivo } = body;
-        if (!cognome) return res.status(400).json({ error: 'Cognome mancante' });
-
-        const updateRes = await fetch(`${supabaseUrl}/rest/v1/utenti?cognome=eq.${encodeURIComponent(cognome)}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({ attivo: attivo === true || attivo === 'true' })
-        });
-
-        if (!updateRes.ok) {
-          const errData = await updateRes.json();
-          throw new Error(JSON.stringify(errData));
-        }
-
-        return res.status(200).json({ success: true, message: `Stato attivo aggiornato per ${cognome}` });
-      }
-
-      // 4. Controllo accesso o recupero utenti protetto da PIN admin
       if (action === 'get-users') {
         const response = await fetch(`${supabaseUrl}/rest/v1/utenti?select=*`, {
           headers: {
@@ -211,7 +178,6 @@ export default async function handler(req, res) {
         return res.status(200).json(users);
       }
 
-      // 5. Aggiunta nuovo utente
       if (action === 'add') {
         const { cognome, newPin } = body;
         if (!cognome) return res.status(400).json({ error: 'Cognome obbligatorio' });
@@ -230,7 +196,6 @@ export default async function handler(req, res) {
             cognome: cognome.trim(),
             pin: pinDaUsare,
             is_admin: false,
-            attivo: true,
             quota_pagata: false,
             anno_quota: new Date().getFullYear().toString()
           })
@@ -244,7 +209,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, pin: pinDaUsare });
       }
 
-      // 6. Eliminazione utente
       if (action === 'delete') {
         const { cognome } = body;
         if (!cognome || cognome.toLowerCase() === 'admin') {
@@ -263,7 +227,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
       }
 
-      // 7. Reset PIN o Modifica PIN
       if (action === 'reset-pin') {
         const { cognome, newPin } = body;
         if (!cognome || !newPin) return res.status(400).json({ error: 'Dati incompleti' });
@@ -283,7 +246,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
       }
 
-      // 8. Log di audit
       if (action === 'get-logs') {
         return res.status(200).json([]);
       }
@@ -299,7 +261,6 @@ export default async function handler(req, res) {
   }
 }
 
-// Funzione di supporto JWT per Google Calendar API
 async function getGoogleJWT(clientEmail, privateKey) {
   const header = { alg: 'RS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
