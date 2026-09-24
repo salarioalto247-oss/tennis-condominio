@@ -189,7 +189,7 @@
 
   <!-- Footer con Versione dell'App -->
   <footer style="text-align: center; padding: 15px; color: #666; font-size: 12px; border-top: 1px solid #eee; background: #fff;">
-    Intercondominio Salario Alto - Versione App: <b>1.4.1</b>
+    Intercondominio Salario Alto - Versione App: <b>1.4.2</b>
   </footer>
 
   <!-- Script Principale -->
@@ -413,7 +413,7 @@
               ? { ...userFound, isAdmin: userFound.is_admin } 
               : { cognome: 'Admin', pin: '0000', isAdmin: true, is_admin: true };
 
-            // CONTROLLO BLOCCO UTENTI NON IN REGOLA
+            // CONTROLLO BLOCCO UTENTI NON IN REGOLA (CON SICUREZZA FAIL-SAFE)
             if (supabaseClient && !tempUser.isAdmin) {
               try {
                 // 1. Verifica se il blocco globale è attivo
@@ -424,17 +424,19 @@
                   .single();
 
                 if (impData && impData.valore === true) {
-                  const annoCorrente = "2026";
-                  
-                  // 2. Verifica lo stato pagamenti per l'utente e l'anno corrente (gestendo il campo anno_quota come testo/numero)
-                  const { data: pagData } = await supabaseClient
-                    .from('pagamenti')
-                    .select('quota_pagata, anno_quota')
-                    .ilike('cognome', tempUser.cognome)
-                    .eq('anno_quota', annoCorrente)
-                    .maybeSingle();
+                  const annoTarget = "2026";
+                  let quotaValida = false;
 
-                  const quotaValida = pagData && (pagData.quota_pagata === true || pagData.quota_pagata === 'true');
+                  // 2. Controlliamo i dati direttamente dall'utente in cache (proveniente dalla tabella principale)[cite: 4]
+                  if (userFound && userFound.anno_quota !== undefined && userFound.quota_pagata !== undefined) {
+                    if (userFound.anno_quota != null && String(userFound.anno_quota).trim() === annoTarget && 
+                       (userFound.quota_pagata === true || String(userFound.quota_pagata).toLowerCase() === 'true')) {
+                      quotaValida = true;
+                    }
+                  } else {
+                    // Fallsafe: se non trovati in cache, consideriamo valido per evitare falsi blocchi bloccanti
+                    quotaValida = true; 
+                  }
 
                   if (!quotaValida) {
                     if (mostraErroriUI && errorEl) {
@@ -446,7 +448,7 @@
                   }
                 }
               } catch (blockErr) {
-                console.warn("Controllo blocco saltato/fallito:", blockErr);
+                console.warn("Controllo blocco saltato/fallito, procedo con accesso:", blockErr);
               }
             }
 
@@ -1031,15 +1033,15 @@
         } else {
           if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
             let rimosso = false;
-            const nuoviUtenti = utentiSlot.filter(u => {
+            const novosUtenti = utentiSlot.filter(u => {
               if (!rimosso && u.toLowerCase() === currentUser.cognome.toLowerCase()) {
                 rimosso = true;
                 return false;
               }
               return true;
             });
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
+            prenotazioniGlobali[chiaveSlot] = novosUtenti;
+            await salvaPrenotazioneGoogle(chiaveSlot, novosUtenti, 'CANCELLAZIONE');
             await caricaTabellone();
           }
         }
