@@ -189,7 +189,7 @@
 
   <!-- Footer con Versione dell'App -->
   <footer style="text-align: center; padding: 15px; color: #666; font-size: 12px; border-top: 1px solid #eee; background: #fff;">
-    Intercondominio Salario Alto - Versione App: <b>1.4.0</b>
+    Intercondominio Salario Alto - Versione App: <b>1.4.1</b>
   </footer>
 
   <!-- Script Principale -->
@@ -424,15 +424,16 @@
                   .single();
 
                 if (impData && impData.valore === true) {
-                  // 2. Verifica lo stato pagamenti dell'utente
+                  const annoCorrente = 2026;
+                  // 2. Verifica lo stato pagamenti filtrando per anno e gestendo righe multiple
                   const { data: pagData } = await supabaseClient
                     .from('pagamenti')
                     .select('quota_pagata, anno_quota')
                     .ilike('cognome', tempUser.cognome)
-                    .single();
+                    .eq('anno_quota', annoCorrente)
+                    .maybeSingle();
 
-                  const annoCorrente = 2026;
-                  const inRegola = pagData && pagData.quota_pagata === true && parseInt(pagData.anno_quota, 10) === annoCorrente;
+                  const inRegola = pagData && pagData.quota_pagata === true;
 
                   if (!inRegola) {
                     if (mostraErroriUI && errorEl) {
@@ -1022,7 +1023,7 @@
             await caricaTabellone();
           } else {
             const nuoviUtenti = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
+            prenotazioniGlobali[chiaveSlot] = nouveauxUtenti = nuoviUtenti;
             await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
             await caricaTabellone();
           }
