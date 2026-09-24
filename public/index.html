@@ -5,6 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Intercondominio Salario Alto - Prenotazione Campo Tennis</title>
+  <!-- Supabase Client CDN aggiunto per leggere il blocco globale -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -197,6 +199,20 @@
     let prenotazioniGlobali = {}; 
     let prenotazioniPrecedenti = {};
     let refreshInterval = null;
+
+    // Inizializzazione Supabase per controllo pagamenti/blocco
+    let supabaseClient = null;
+    try {
+        if (window.supabase) {
+            const url = 'https://njfskglgofxkumyxfnyr.supabase.co';
+            const key = 'sb_publishable_ykUHh5HlqPmKdjAzfVMp5Q_SIY3FgRP';
+            if (url && !url.includes('INSERISCI')) {
+                supabaseClient = window.supabase.createClient(url, key);
+            }
+        }
+    } catch (e) {
+        console.warn("Supabase initialization skipped:", e);
+    }
 
     window.addEventListener('DOMContentLoaded', async () => {
       await scaricaListaUtentiPerAutocheck();
@@ -393,10 +409,46 @@
           const isMaster = (cognome.toLowerCase() === 'admin' && pin === '0000');
 
           if (userFound || isMaster) {
-            currentUser = userFound 
+            const tempUser = userFound 
               ? { ...userFound, isAdmin: userFound.is_admin } 
               : { cognome: 'Admin', pin: '0000', isAdmin: true, is_admin: true };
-            
+
+            // CONTROLLO BLOCCO UTENTI NON IN REGOLA
+            if (supabaseClient && !tempUser.isAdmin) {
+              try {
+                // 1. Verifica se il blocco globale è attivo
+                const { data: impData } = await supabaseClient
+                  .from('impostazioni')
+                  .select('valore')
+                  .eq('chiave', 'blocco_utenti_attivo')
+                  .single();
+
+                if (impData && impData.valore === true) {
+                  // 2. Verifica lo stato pagamenti dell'utente
+                  const { data: pagData } = await supabaseClient
+                    .from('pagamenti')
+                    .select('quota_pagata, anno_quota')
+                    .ilike('cognome', tempUser.cognome)
+                    .single();
+
+                  const annoCorrente = 2026;
+                  const inRegola = pagData && pagData.quota_pagata === true && parseInt(pagData.anno_quota, 10) === annoCorrente;
+
+                  if (!inRegola) {
+                    if (mostraErroriUI && errorEl) {
+                      errorEl.textContent = 'Accesso bloccato: quota non pagata per il 2026.';
+                    } else {
+                      logoutUser();
+                    }
+                    return;
+                  }
+                }
+              } catch (blockErr) {
+                console.warn("Controllo blocco saltato/fallito:", blockErr);
+              }
+            }
+
+            currentUser = tempUser;
             localStorage.setItem('tennis_user', currentUser.cognome);
             localStorage.setItem('tennis_pin', currentUser.pin);
 
