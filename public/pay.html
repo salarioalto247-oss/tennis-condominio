@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestione Pagamenti - Tennis Club Suvereto</title>
+    <!-- Favicon pallina da tennis -->
+    <link rel="icon" type="image/png" href="favicon.png"> <!-- Sostituisci il percorso se usi un file specifico o un'emoji convertita -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Supabase Client CDN (necessario per la gestione della tabella impostazioni) -->
+    <!-- Supabase Client CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-gray-50 min-h-screen p-6">
@@ -89,7 +91,6 @@
     </div>
 
     <script>
-        // Inizializzazione sicura e protetta di Supabase con l'URL corretto
         let supabaseClient = null;
         try {
             if (window.supabase) {
@@ -166,7 +167,6 @@
             checkAccess();
         }
 
-        // --- Logica Gestione Impostazione Blocco Utenti ---
         async function caricaImpostazioneBlocco() {
             const toggleSwitch = document.getElementById("toggleBloccoUtenti");
             const statusMsg = document.getElementById("statusBloccoMsg");
@@ -225,7 +225,6 @@
                 });
             }
         });
-        // -------------------------------------------------------------
 
         async function caricaPagamenti() {
             const tbody = document.getElementById('tabella-pagamenti');
