@@ -74,14 +74,14 @@
         <h2 class="text-xl font-bold text-gray-800 mb-2">Accesso Amministratore</h2>
         <p class="text-gray-600 text-sm mb-6">Inserisci il PIN amministrativo.</p>
         
-        <form onsubmit="gestisciLogin(event)" class="space-y-4">
-            <input type="password" id="admin-pin" placeholder="Inserisci PIN" required
+        <div class="space-y-4">
+            <input type="password" id="admin-pin" placeholder="Inserisci PIN"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-center tracking-widest text-lg">
-            <button type="submit" id="btn-accedi" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
+            <button type="button" id="btn-accedi" onclick="tentaAccessoDiretto()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">
                 Accedi
             </button>
             <p id="login-error" class="text-red-500 text-xs hidden">PIN non valido.</p>
-        </form>
+        </div>
         
         <div class="mt-6 border-t pt-4">
             <a href="index.html" class="text-blue-600 hover:underline text-sm font-medium">← Torna alla Home</a>
@@ -118,15 +118,16 @@
             }
         }
 
-        async function gestisciLogin(event) {
-            event.preventDefault();
-            console.log("--> Funzione gestisciLogin avviata con successo!");
-            
+        async function tentaAccessoDiretto() {
+            console.log("--> Click sul pulsante Accesso Diretto!");
             const pinInput = document.getElementById('admin-pin').value.trim();
             const errorEl = document.getElementById('login-error');
             const btnAccedi = document.getElementById('btn-accedi');
 
-            console.log("PIN inserito:", pinInput);
+            if (!pinInput) {
+                alert("Inserisci un PIN!");
+                return;
+            }
 
             errorEl.classList.add('hidden');
             btnAccedi.textContent = 'Verifica in corso...';
@@ -139,7 +140,7 @@
                     body: JSON.stringify({ adminPin: pinInput, action: 'get-users' })
                 });
                 
-                console.log("Risposta ricevuta dal server, status:", response.status);
+                console.log("Risposta server status:", response.status);
                 const data = await response.json();
                 console.log("Dati ricevuti:", data);
 
@@ -148,16 +149,15 @@
                     const isMaster = (pinInput === '0000');
 
                     if (userFound || isMaster) {
-                        console.log("Login autorizzato! Reindirizzamento...");
+                        console.log("Login autorizzato!");
                         localStorage.setItem('isAdmin', 'true');
                         checkAccess();
                         return;
                     }
                 }
-                console.warn("PIN non valido o dati non corrispondenti.");
                 errorEl.classList.remove('hidden');
             } catch (err) {
-                console.error("Errore critico durante il login:", err);
+                console.error("Errore di connessione:", err);
                 errorEl.textContent = 'Errore di connessione';
                 errorEl.classList.remove('hidden');
             } finally {
