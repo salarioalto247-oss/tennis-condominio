@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestione Pagamenti - Tennis Club Suvereto</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Supabase Client CDN (necessario per la gestione della tabella impostazioni) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-gray-50 min-h-screen p-6">
 
@@ -17,6 +19,21 @@
                 <a href="index.html" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium transition">← Torna al Calendar</a>
             </div>
         </header>
+
+        <!-- Sezione Impostazioni Globali (Aggiunta) -->
+        <section class="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h2 class="text-lg font-semibold text-amber-900 mb-1">Configurazione Blocco Accessi Globale</h2>
+                <p class="text-amber-700 text-sm">Abilita o disabilita centralmente il blocco per gli utenti non in regola.</p>
+            </div>
+            <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-amber-300 shadow-sm">
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggleBloccoUtenti" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+                <span id="statusBloccoMsg" class="text-xs font-medium text-gray-700">Caricamento...</span>
+            </div>
+        </section>
 
         <section class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4 flex justify-between items-center">
             <div>
@@ -72,6 +89,11 @@
     </div>
 
     <script>
+        // Configurazione Supabase (Client-side per lettura/scrittura impostazioni protette da RLS)
+        const SUPABASE_URL = 'INSERISCI_URL_SUPABASE'; // Sostituisci o usa le tue credenziali esistenti se configurate altrove
+        const SUPABASE_ANON_KEY = 'INSERISCI_ANON_KEY_SUPABASE';
+        const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
         const ANNO_CORRENTE = 2026;
 
         function checkAccess() {
@@ -80,6 +102,7 @@
                 document.getElementById('admin-container').classList.remove('hidden');
                 document.getElementById('login-container').classList.add('hidden');
                 caricaPagamenti();
+                caricaImpostazioneBlocco(); // Carica lo stato del toggle globale
             } else {
                 document.getElementById('admin-container').classList.add('hidden');
                 document.getElementById('login-container').classList.remove('hidden');
@@ -129,6 +152,59 @@
             checkAccess();
         }
 
+        // --- Logica Gestione Impostazione Blocco Utenti (Aggiunta) ---
+        async function caricaImpostazioneBlocco() {
+            const toggleSwitch = document.getElementById("toggleBloccoUtenti");
+            const statusMsg = document.getElementById("statusBloccoMsg");
+            if (!toggleSwitch || !supabase) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('impostazioni')
+                    .select('valore')
+                    .eq('chiave', 'blocco_utenti_attivo')
+                    .single();
+
+                if (error) throw error;
+
+                toggleSwitch.checked = data ? data.valore : false;
+                statusMsg.textContent = data.valore ? "Attivo" : "Disattivo";
+            } catch (err) {
+                console.error("Errore nel recupero delle impostazioni:", err.message);
+                statusMsg.textContent = "Errore caricamento";
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const toggleSwitch = document.getElementById("toggleBloccoUtenti");
+            const statusMsg = document.getElementById("statusBloccoMsg");
+
+            if (toggleSwitch) {
+                toggleSwitch.addEventListener("change", async (e) => {
+                    const nuovoValore = e.target.checked;
+                    if (statusMsg) statusMsg.textContent = "Salvataggio...";
+
+                    try {
+                        const { error } = await supabase
+                            .from('impostazioni')
+                            .update({ valore: nuovoValore })
+                            .eq('chiave', 'blocco_utenti_attivo');
+
+                        if (error) throw error;
+
+                        if (statusMsg) {
+                            statusMsg.textContent = nuovoValore ? "Attivo" : "Disattivo";
+                        }
+                    } catch (err) {
+                        console.error("Errore durante l'aggiornamento:", err.message);
+                        if (statusMsg) statusMsg.textContent = "Errore!";
+                        toggleSwitch.checked = !nuovoValore; // Ripristina in caso di fallimento
+                    }
+                });
+            }
+        });
+        // -------------------------------------------------------------
+
         async function caricaPagamenti() {
             const tbody = document.getElementById('tabella-pagamenti');
             tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-blue-600 animate-pulse">Caricamento dati soci...</td></tr>`;
@@ -145,12 +221,10 @@
                         const annoQuota = u.anno_quota ? parseInt(u.anno_quota, 10) : ANNO_CORRENTE;
                         const dataPagamento = u.data_pagamento ? u.data_pagamento.split('T')[0] : '';
 
-                        // Calcolo attivo
                         const isAttivoAuto = quotaPagata && (annoQuota === ANNO_CORRENTE);
                         const testoAttivo = isAttivoAuto ? 'Sì' : 'No';
                         const badgeColor = isAttivoAuto ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
 
-                        // Generazione opzioni per la select dell'anno (da 2024 a 2030)
                         let anniOptions = '';
                         for (let anno = 2024; anno <= 2030; anno++) {
                             anniOptions += `<option value="${anno}" ${annoQuota === anno ? 'selected' : ''}>${anno}</option>`;
