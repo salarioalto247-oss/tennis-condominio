@@ -424,8 +424,9 @@
                   .single();
 
                 if (impData && impData.valore === true) {
-                  const annoCorrente = 2026;
-                  // 2. Verifica lo stato pagamenti filtrando per anno e gestendo righe multiple
+                  const annoCorrente = "2026";
+                  
+                  // 2. Verifica lo stato pagamenti per l'utente e l'anno corrente (gestendo il campo anno_quota come testo/numero)
                   const { data: pagData } = await supabaseClient
                     .from('pagamenti')
                     .select('quota_pagata, anno_quota')
@@ -433,9 +434,9 @@
                     .eq('anno_quota', annoCorrente)
                     .maybeSingle();
 
-                  const inRegola = pagData && pagData.quota_pagata === true;
+                  const quotaValida = pagData && (pagData.quota_pagata === true || pagData.quota_pagata === 'true');
 
-                  if (!inRegola) {
+                  if (!quotaValida) {
                     if (mostraErroriUI && errorEl) {
                       errorEl.textContent = 'Accesso bloccato: quota non pagata per il 2026.';
                     } else {
@@ -1023,7 +1024,7 @@
             await caricaTabellone();
           } else {
             const nuoviUtenti = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-            prenotazioniGlobali[chiaveSlot] = nouveauxUtenti = nuoviUtenti;
+            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
             await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
             await caricaTabellone();
           }
