@@ -92,15 +92,9 @@
         // Inizializzazione sicura e protetta di Supabase
         let supabase = null;
         try {
-            const supabaseUrl = 'https://tvuydkcfvuhjbnkmvtrb.supabase.co'; // Sostituisci se hai un URL specifico, oppure usa quello esistente del progetto
-            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Chiave pubblica anon se necessaria, oppure gestita in sicurezza
-            
-            // Se window.supabase è disponibile e abbiamo le credenziali o se usi un client globale esistente:
             if (window.supabase) {
-                // Se nel progetto le credenziali sono altrove, puoi riprenderle o impostarle qui in sicurezza
-                // Esempio con fallback sicuro se non definiti i placeholder:
-                const url = window.SUPABASE_URL || 'https://tuo-progetto.supabase.co';
-                const key = window.SUPABASE_ANON_KEY || 'tua-chiave-anon';
+                const url = window.SUPABASE_URL || 'https://tvuydkcfvuhjbnkmvtrb.supabase.co';
+                const key = window.SUPABASE_ANON_KEY || 'pubbliche-o-vuote';
                 if (url && !url.includes('INSERISCI')) {
                     supabase = window.supabase.createClient(url, key);
                 }
@@ -126,9 +120,13 @@
 
         async function gestisciLogin(event) {
             event.preventDefault();
+            console.log("--> Funzione gestisciLogin avviata con successo!");
+            
             const pinInput = document.getElementById('admin-pin').value.trim();
             const errorEl = document.getElementById('login-error');
             const btnAccedi = document.getElementById('btn-accedi');
+
+            console.log("PIN inserito:", pinInput);
 
             errorEl.classList.add('hidden');
             btnAccedi.textContent = 'Verifica in corso...';
@@ -140,20 +138,26 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ adminPin: pinInput, action: 'get-users' })
                 });
+                
+                console.log("Risposta ricevuta dal server, status:", response.status);
                 const data = await response.json();
+                console.log("Dati ricevuti:", data);
 
                 if (response.ok && Array.isArray(data)) {
                     const userFound = data.find(u => u.pin === pinInput && (u.is_admin || u.cognome.toLowerCase() === 'admin'));
                     const isMaster = (pinInput === '0000');
 
                     if (userFound || isMaster) {
+                        console.log("Login autorizzato! Reindirizzamento...");
                         localStorage.setItem('isAdmin', 'true');
                         checkAccess();
                         return;
                     }
                 }
+                console.warn("PIN non valido o dati non corrispondenti.");
                 errorEl.classList.remove('hidden');
             } catch (err) {
+                console.error("Errore critico durante il login:", err);
                 errorEl.textContent = 'Errore di connessione';
                 errorEl.classList.remove('hidden');
             } finally {
