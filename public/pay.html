@@ -89,12 +89,12 @@
     </div>
 
     <script>
-        // Inizializzazione sicura e protetta di Supabase (dichiarata una sola volta)
+        // Inizializzazione sicura e protetta di Supabase con credenziali reali
         let supabaseClient = null;
         try {
             if (window.supabase) {
-                const url = window.SUPABASE_URL || 'https://tvuydkcfvuhjbnkmvtrb.supabase.co';
-                const key = window.SUPABASE_ANON_KEY || 'pubbliche-o-vuote';
+                const url = 'https://njfskglgofxkumyxfonyr.supabase.co';
+                const key = 'sb_publishable_ykUHh5HlqPmKdjAzfVMp5Q_SIY3FgRP';
                 if (url && !url.includes('INSERISCI')) {
                     supabaseClient = window.supabase.createClient(url, key);
                 }
