@@ -89,11 +89,11 @@
     </div>
 
     <script>
-        // Inizializzazione sicura e protetta di Supabase con credenziali reali
+        // Inizializzazione sicura e protetta di Supabase con l'URL corretto
         let supabaseClient = null;
         try {
             if (window.supabase) {
-                const url = 'https://njfskglgofxkumyxfonyr.supabase.co';
+                const url = 'https://njfskglgofxkumyxfnyr.supabase.co';
                 const key = 'sb_publishable_ykUHh5HlqPmKdjAzfVMp5Q_SIY3FgRP';
                 if (url && !url.includes('INSERISCI')) {
                     supabaseClient = window.supabase.createClient(url, key);
