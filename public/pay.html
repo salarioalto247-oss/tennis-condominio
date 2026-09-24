@@ -20,7 +20,7 @@
             </div>
         </header>
 
-        <!-- Sezione Impostazioni Globali (Aggiunta) -->
+        <!-- Sezione Impostazioni Globali -->
         <section class="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
                 <h2 class="text-lg font-semibold text-amber-900 mb-1">Configurazione Blocco Accessi Globale</h2>
@@ -89,14 +89,14 @@
     </div>
 
     <script>
-        // Inizializzazione sicura e protetta di Supabase
-        let supabase = null;
+        // Inizializzazione sicura e protetta di Supabase (dichiarata una sola volta)
+        let supabaseClient = null;
         try {
             if (window.supabase) {
                 const url = window.SUPABASE_URL || 'https://tvuydkcfvuhjbnkmvtrb.supabase.co';
                 const key = window.SUPABASE_ANON_KEY || 'pubbliche-o-vuote';
                 if (url && !url.includes('INSERISCI')) {
-                    supabase = window.supabase.createClient(url, key);
+                    supabaseClient = window.supabase.createClient(url, key);
                 }
             }
         } catch (e) {
@@ -119,7 +119,6 @@
         }
 
         async function tentaAccessoDiretto() {
-            console.log("--> Click sul pulsante Accesso Diretto!");
             const pinInput = document.getElementById('admin-pin').value.trim();
             const errorEl = document.getElementById('login-error');
             const btnAccedi = document.getElementById('btn-accedi');
@@ -140,16 +139,13 @@
                     body: JSON.stringify({ adminPin: pinInput, action: 'get-users' })
                 });
                 
-                console.log("Risposta server status:", response.status);
                 const data = await response.json();
-                console.log("Dati ricevuti:", data);
 
                 if (response.ok && Array.isArray(data)) {
                     const userFound = data.find(u => u.pin === pinInput && (u.is_admin || u.cognome.toLowerCase() === 'admin'));
                     const isMaster = (pinInput === '0000');
 
                     if (userFound || isMaster) {
-                        console.log("Login autorizzato!");
                         localStorage.setItem('isAdmin', 'true');
                         checkAccess();
                         return;
@@ -157,7 +153,6 @@
                 }
                 errorEl.classList.remove('hidden');
             } catch (err) {
-                console.error("Errore di connessione:", err);
                 errorEl.textContent = 'Errore di connessione';
                 errorEl.classList.remove('hidden');
             } finally {
@@ -175,13 +170,13 @@
         async function caricaImpostazioneBlocco() {
             const toggleSwitch = document.getElementById("toggleBloccoUtenti");
             const statusMsg = document.getElementById("statusBloccoMsg");
-            if (!toggleSwitch || !supabase) {
+            if (!toggleSwitch || !supabaseClient) {
                 if (statusMsg) statusMsg.textContent = "Non configurato";
                 return;
             }
 
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('impostazioni')
                     .select('valore')
                     .eq('chiave', 'blocco_utenti_attivo')
@@ -204,7 +199,7 @@
             if (toggleSwitch) {
                 toggleSwitch.addEventListener("change", async (e) => {
                     const nuovoValore = e.target.checked;
-                    if (!supabase) {
+                    if (!supabaseClient) {
                         alert("Client Supabase non disponibile.");
                         toggleSwitch.checked = !nuovoValore;
                         return;
@@ -212,7 +207,7 @@
                     if (statusMsg) statusMsg.textContent = "Salvataggio...";
 
                     try {
-                        const { error } = await supabase
+                        const { error } = await supabaseClient
                             .from('impostazioni')
                             .update({ valore: nuovoValore })
                             .eq('chiave', 'blocco_utenti_attivo');
