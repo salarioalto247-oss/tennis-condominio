@@ -189,7 +189,7 @@
 
   <!-- Footer con Versione dell'App -->
   <footer style="text-align: center; padding: 15px; color: #666; font-size: 12px; border-top: 1px solid #eee; background: #fff;">
-    Intercondominio Salario Alto - Versione App: <b>1.4.2</b>
+    Intercondominio Salario Alto - Versione App: <b>1.4.3</b>
   </footer>
 
   <!-- Script Principale -->
@@ -427,14 +427,13 @@
                   const annoTarget = "2026";
                   let quotaValida = false;
 
-                  // 2. Controlliamo i dati direttamente dall'utente in cache (proveniente dalla tabella principale)[cite: 4]
+                  // 2. Controlliamo i dati direttamente dall'utente in cache
                   if (userFound && userFound.anno_quota !== undefined && userFound.quota_pagata !== undefined) {
                     if (userFound.anno_quota != null && String(userFound.anno_quota).trim() === annoTarget && 
                        (userFound.quota_pagata === true || String(userFound.quota_pagata).toLowerCase() === 'true')) {
                       quotaValida = true;
                     }
                   } else {
-                    // Fallsafe: se non trovati in cache, consideriamo valido per evitare falsi blocchi bloccanti
                     quotaValida = true; 
                   }
 
@@ -1033,15 +1032,15 @@
         } else {
           if (confirm(`Vuoi rimuovere la tua prenotazione del giorno ${dataIso} alle ore ${ora}?`)) {
             let rimosso = false;
-            const novosUtenti = utentiSlot.filter(u => {
+            const nuoviUtenti = utentiSlot.filter(u => {
               if (!rimosso && u.toLowerCase() === currentUser.cognome.toLowerCase()) {
                 rimosso = true;
                 return false;
               }
               return true;
             });
-            prenotazioniGlobali[chiaveSlot] = novosUtenti;
-            await salvaPrenotazioneGoogle(chiaveSlot, novosUtenti, 'CANCELLAZIONE');
+            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
+            await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
             await caricaTabellone();
           }
         }
