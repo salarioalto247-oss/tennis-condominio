@@ -89,10 +89,25 @@
     </div>
 
     <script>
-        // Configurazione Supabase (Client-side per lettura/scrittura impostazioni protette da RLS)
-        const SUPABASE_URL = 'INSERISCI_URL_SUPABASE'; // Sostituisci o usa le tue credenziali esistenti se configurate altrove
-        const SUPABASE_ANON_KEY = 'INSERISCI_ANON_KEY_SUPABASE';
-        const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+        // Inizializzazione sicura e protetta di Supabase
+        let supabase = null;
+        try {
+            const supabaseUrl = 'https://tvuydkcfvuhjbnkmvtrb.supabase.co'; // Sostituisci se hai un URL specifico, oppure usa quello esistente del progetto
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Chiave pubblica anon se necessaria, oppure gestita in sicurezza
+            
+            // Se window.supabase è disponibile e abbiamo le credenziali o se usi un client globale esistente:
+            if (window.supabase) {
+                // Se nel progetto le credenziali sono altrove, puoi riprenderle o impostarle qui in sicurezza
+                // Esempio con fallback sicuro se non definiti i placeholder:
+                const url = window.SUPABASE_URL || 'https://tuo-progetto.supabase.co';
+                const key = window.SUPABASE_ANON_KEY || 'tua-chiave-anon';
+                if (url && !url.includes('INSERISCI')) {
+                    supabase = window.supabase.createClient(url, key);
+                }
+            }
+        } catch (e) {
+            console.warn("Supabase initialization skipped:", e);
+        }
 
         const ANNO_CORRENTE = 2026;
 
@@ -102,7 +117,7 @@
                 document.getElementById('admin-container').classList.remove('hidden');
                 document.getElementById('login-container').classList.add('hidden');
                 caricaPagamenti();
-                caricaImpostazioneBlocco(); // Carica lo stato del toggle globale
+                caricaImpostazioneBlocco(); 
             } else {
                 document.getElementById('admin-container').classList.add('hidden');
                 document.getElementById('login-container').classList.remove('hidden');
@@ -152,11 +167,14 @@
             checkAccess();
         }
 
-        // --- Logica Gestione Impostazione Blocco Utenti (Aggiunta) ---
+        // --- Logica Gestione Impostazione Blocco Utenti ---
         async function caricaImpostazioneBlocco() {
             const toggleSwitch = document.getElementById("toggleBloccoUtenti");
             const statusMsg = document.getElementById("statusBloccoMsg");
-            if (!toggleSwitch || !supabase) return;
+            if (!toggleSwitch || !supabase) {
+                if (statusMsg) statusMsg.textContent = "Non configurato";
+                return;
+            }
 
             try {
                 const { data, error } = await supabase
@@ -182,6 +200,11 @@
             if (toggleSwitch) {
                 toggleSwitch.addEventListener("change", async (e) => {
                     const nuovoValore = e.target.checked;
+                    if (!supabase) {
+                        alert("Client Supabase non disponibile.");
+                        toggleSwitch.checked = !nuovoValore;
+                        return;
+                    }
                     if (statusMsg) statusMsg.textContent = "Salvataggio...";
 
                     try {
@@ -198,7 +221,7 @@
                     } catch (err) {
                         console.error("Errore durante l'aggiornamento:", err.message);
                         if (statusMsg) statusMsg.textContent = "Errore!";
-                        toggleSwitch.checked = !nuovoValore; // Ripristina in caso di fallimento
+                        toggleSwitch.checked = !nuovoValore; 
                     }
                 });
             }
