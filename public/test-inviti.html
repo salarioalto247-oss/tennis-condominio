@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Console - Test Tabella inviti_doppio</title>
+    <!-- Supabase Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 30px auto; padding: 20px; background: #f4f4f9; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { margin-top: 0; color: #2b6cb0; }
+        label { font-weight: bold; font-size: 14px; display: block; margin-top: 10px; }
+        input, select { width: 100%; padding: 8px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #3182ce; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px; margin-right: 10px; margin-bottom: 10px; }
+        button.success { background: #38a169; }
+        button.danger { background: #e53e3e; }
+        button:hover { opacity: 0.9; }
+        pre { background: #1e1e1e; color: #4ec9b0; padding: 15px; border-radius: 5px; overflow-x: auto; max-height: 300px; font-size: 13px; }
+        .flex { display: flex; gap: 10px; }
+        .flex > div { flex: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>1. Inserisci Invito di Test (Scrittura)</h2>
+        <p>Crea un record di prova nella tabella <b>inviti_doppio</b> su Supabase.</p>
+        
+        <div class="flex">
+            <div>
+                <label for="testSlot">Chiave Slot:</label>
+                <input type="text" id="testSlot" value="2026-09-26_09:00">
+            </div>
+            <div>
+                <label for="testStato">Stato Iniziale:</label>
+                <select id="testStato">
+                    <option value="in_attesa" selected>in_attesa</option>
+                    <option value="accettato">accettato</option>
+                    <option value="rifiutato">rifiutato</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex">
+            <div>
+                <label for="testProponente">Proponente (Chi vuole unirsi):</label>
+                <input type="text" id="testProponente" value="Giliberti">
+            </div>
+            <div>
+                <label for="testDestinatario">Destinatario (Proprietario slot):</label>
+                <input type="text" id="testDestinatario" value="Bonini">
+            </div>
+        </div>
+
+        <button class="success" onclick="eseguiInserimentoTest()">Inserisci Invito nel DB</button>
+    </div>
+
+    <div class="card">
+        <h2>2. Leggi Inviti (Lettura Tabella)</h2>
+        <p>Interroga la tabella Supabase per visualizzare tutti gli inviti presenti.</p>
+        <button onclick="eseguiLetturaTest()">Leggi Tutti gli Inviti</button>
+    </div>
+
+    <div class="card">
+        <h2>Console Log & Risposta Supabase</h2>
+        <pre id="output">In attesa di comandi...</pre>
+    </div>
+
+    <script>
+        // Inizializzazione Supabase con le credenziali del progetto
+        const supabaseUrl = 'https://njfskglgofxkumyxfnyr.supabase.co';
+        const supabaseKey = 'sb_publishable_ykUHh5HlqPmKdjAzfVMp5Q_SIY3FgRP';
+        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function log(data, isError = false) {
+            const output = document.getElementById('output');
+            output.style.color = isError ? '#f14c4c' : '#4ec9b0';
+            if (typeof data === 'object') {
+                output.innerText = JSON.stringify(data, null, 2);
+            } else {
+                output.innerText = data;
+            }
+        }
+
+        async function eseguiInserimentoTest() {
+            const chiave_slot = document.getElementById('testSlot').value.trim();
+            const proponente = document.getElementById('testProponente').value.trim();
+            const destinatario = document.getElementById('testDestinatario').value.trim();
+            const stato = document.getElementById('testStato').value;
+
+            log(`Tentativo di scrittura su inviti_doppio per ${proponente} -> ${destinatario}...`);
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('inviti_doppio')
+                    .insert([{ chiave_slot, proponente, destinatario, stato }])
+                    .select();
+
+                if (error) throw error;
+
+                log({ messaggio: "Scrittura riuscita con successo!", recordInserito: data });
+            } catch (err) {
+                log('ERRORE DI SCRITTURA:\n' + JSON.stringify(err, null, 2), true);
+            }
+        }
+
+        async function eseguiLetturaTest() {
+            log('Lettura di tutti i record dalla tabella inviti_doppio...');
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('inviti_doppio')
+                    .select('*')
+                    .order('id', { ascending: false });
+
+                if (error) throw error;
+
+                log({ messaggio: `Trovati ${data.length} record`, records: data });
+            } catch (err) {
+                log('ERRORE DI LETTURA:\n' + JSON.stringify(err, null, 2), true);
+            }
+        }
+    </script>
+</body>
+</html>

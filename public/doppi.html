@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E🎾%3C/text%3E%3C/svg%3E">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Inviti Doppio - Intercondominio Salario Alto</title>
+  <!-- Supabase Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    header {
+      background-color: #fff;
+      padding: 15px 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .container {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    h2, h3 { color: #2b6cb0; margin-top: 0; }
+    .btn {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-green { background: #38a169; color: white; }
+    .btn-green:hover { background: #2f855a; }
+    .btn-red { background: #e53e3e; color: white; }
+    .btn-red:hover { background: #c53030; }
+    .btn-blue { background: #3182ce; color: white; }
+    .btn-blue:hover { background: #2b6cb0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+    th { background: #f4f4f4; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h2 style="margin: 0; font-size: 18px;">🎾 Gestione Inviti per il Doppio</h2>
+    <div>
+      <span id="user-display" style="font-weight: bold; margin-right: 15px;"></span>
+      <button class="btn btn-blue" onclick="window.location.href='index.html'">Torna al Tabellone</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Sezione 1: Inviti Ricevuti (Da Accettare/Rifiutare) -->
+    <div class="card">
+      <h3>📥 Richieste Ricevute (Da parte di altri condomini)</h3>
+      <p style="font-size: 13px; color: #666;">Questi utenti vogliono unirsi alle tue prenotazioni come doppio.</p>
+      <div id="inviti-ricevuti-list">Caricamento richieste...</div>
+    </div>
+
+    <!-- Sezione 2: Inviti Inviati (In attesa di risposta) -->
+    <div class="card">
+      <h3>📤 Le tue Richieste Inviate</h3>
+      <p style="font-size: 13px; color: #666;">Stato delle richieste che hai inviato ad altri utenti.</p>
+      <div id="inviti-inviati-list">Caricamento richieste...</div>
+    </div>
+  </div>
+
+  <script>
+    let currentCognome = localStorage.getItem('tennis_user');
+    let currentPin = localStorage.getItem('tennis_pin');
+
+    // Inizializzazione Supabase
+    let supabaseClient = null;
+    try {
+      if (window.supabase) {
+        const url = 'https://njfskglgofxkumyxfnyr.supabase.co';
+        const key = 'sb_publishable_ykUHh5HlqPmKdjAzfVMp5Q_SIY3FgRP';
+        supabaseClient = window.supabase.createClient(url, key);
+      }
+    } catch (e) {
+      console.error("Errore inizializzazione Supabase:", e);
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (!currentCognome || !currentPin) {
+        alert("Devi effettuare l'accesso dal tabellone principale.");
+        window.location.href = 'index.html';
+        return;
+      }
+      document.getElementById('user-display').textContent = `Utente: ${currentCognome}`;
+      await caricaInviti();
+    });
+
+    async function caricaInviti() {
+      if (!supabaseClient) {
+        document.getElementById('inviti-ricevuti-list').innerHTML = '<span style="color:red;">Connessione a Supabase non disponibile.</span>';
+        return;
+      }
+
+      const adessoIso = new Date().toISOString(); // Es: '2026-09-25T09:04:37.000Z'
+
+      try {
+        // 1. Carica inviti ricevuti (destinatario = me, stato = in_attesa)
+        const { data: ricevuti, error: errRicevuti } = await supabaseClient
+          .from('inviti_doppio')
+          .select('*')
+          .ilike('destinatario', currentCognome)
+          .eq('stato', 'in_attesa');
+
+        if (errRicevuti) throw errRicevuti;
+
+        let htmlRicevuti = '';
+        const validiRicevuti = [];
+
+        if (ricevuti && ricevuti.length > 0) {
+          for (let inv of ricevuti) {
+            // chiave_slot è formattata come "2026-09-26_08:00"
+            const [dataSlot, oraSlot] = inv.chiave_slot.split('_');
+            const dataOraSlotIso = `${dataSlot}T${oraSlot}:00:00Z`;
+
+            // Verifica scadenza temporale (se l'ora dello slot è già passata)
+            if (new Date(dataOraSlotIso) < new Date()) {
+              // Segna automaticamente come scaduto nel DB
+              await supabaseClient.from('inviti_doppio').update({ stato: 'scaduto' }).eq('id', inv.id);
+            } else {
+              validiRicevuti.push(inv);
+            }
+          }
+        }
+
+        if (validiRicevuti.length === 0) {
+          htmlRicevuti = '<p style="color: #666; font-style: italic;">Nessuna richiesta in sospeso da accettare.</p>';
+        } else {
+          htmlRicevuti = '<table><tr><th>Data e Ora</th><th>Proponente</th><th style="text-align:center;">Azioni</th></tr>';
+          validiRicevuti.forEach(inv => {
+            const [dataSlot, oraSlot] = inv.chiave_slot.split('_');
+            htmlRicevuti += `
+              <tr>
+                <td><b>${dataSlot}</b> alle <b>${oraSlot}</b></td>
+                <td>${inv.proponente}</td>
+                <td style="text-align:center; white-space: nowrap;">
+                  <button class="btn btn-green" onclick="rispondiInvito(${inv.id}, '${inv.chiave_slot}', '${inv.proponente}', 'accetta')">Accetta</button>
+                  <button class="btn btn-red" onclick="rispondiInvito(${inv.id}, '${inv.chiave_slot}', '${inv.proponente}', 'rifiuta')">Rifiuta</button>
+                </td>
+              </tr>
+            `;
+          });
+          htmlRicevuti += '</table>';
+        }
+        document.getElementById('inviti-ricevuti-list').innerHTML = htmlRicevuti;
+
+        // 2. Carica inviti inviati (proponente = me)
+        const { data: inviati, error: errInviati } = await supabaseClient
+          .from('inviti_doppio')
+          .select('*')
+          .ilike('proponente', currentCognome);
+
+        if (errInviati) throw errInviati;
+
+        let htmlInviati = '';
+        if (!inviati || inviati.length === 0) {
+          htmlInviati = '<p style="color: #666; font-style: italic;">Non hai inviato alcuna richiesta di doppio.</p>';
+        } else {
+          htmlInviati = '<table><tr><th>Data e Ora</th><th>Destinatario</th><th>Stato</th></tr>';
+          inviati.forEach(inv => {
+            const [dataSlot, oraSlot] = inv.chiave_slot.split('_');
+            let badgeColore = '#d69e2e'; // in_attesa
+            if (inv.stato === 'accettato') badgeColore = '#38a169';
+            if (inv.stato === 'rifiutato' || inv.stato === 'scaduto') badgeColore = '#e53e3e';
+
+            htmlInviati += `
+              <tr>
+                <td><b>${dataSlot}</b> alle <b>${oraSlot}</b></td>
+                <td>${inv.destinatario}</td>
+                <td><span style="color: white; background: ${badgeColore}; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">${inv.stato.toUpperCase()}</span></td>
+              </tr>
+            `;
+          });
+          htmlInviati += '</table>';
+        }
+        document.getElementById('inviti-inviati-list').innerHTML = htmlInviati;
+
+      } catch (e) {
+        console.error("Errore caricamento inviti:", e);
+        document.getElementById('inviti-ricevuti-list').innerHTML = '<span style="color:red;">Errore nel caricamento delle richieste.</span>';
+      }
+    }
+
+    async function rispondiInvito(idInvito, chiaveSlot, proponente, azione) {
+      if (!confirm(`Confermi di voler ${azione === 'accetta' ? 'ACCETTARE' : 'RIFIUTARE'} la richiesta di ${proponente}?`)) return;
+
+      try {
+        if (azione === 'accetta') {
+          // 1. Prima recuperiamo lo slot corrente da Google Calendar tramite API server
+          const resGet = await fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adminPin: currentPin, action: 'get-prenotazioni' })
+          });
+          const prenotazioni = await resGet.json();
+          const utentiCorrenti = prenotazioni[chiaveSlot] || [currentCognome];
+
+          // Aggiungiamo il proponente se non è già presente e se non siamo sopra i 2
+          if (!utentiCorrenti.some(u => u.toLowerCase() === proponente.toLowerCase())) {
+            utentiCorrenti.push(proponente);
+          }
+
+          // 2. Salviamo l'aggiornamento su Google Calendar
+          const resSave = await fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminPin: currentPin,
+              action: 'save-prenotazione',
+              chiave: chiaveSlot,
+              utenti: utentiCorrenti,
+              cognome: currentCognome,
+              tipoAzione: 'ACCETTAZIONE_DOPPIO'
+            })
+          });
+
+          if (!resSave.ok) {
+            alert("Errore durante l'aggiornamento del calendario.");
+            return;
+          }
+
+          // 3. Aggiorniamo lo stato dell'invito su Supabase a 'accettato'
+          await supabaseClient.from('inviti_doppio').update({ stato: 'accettato' }).eq('id', idInvito);
+          alert("Richiesta accettata! La prenotazione è stata aggiornata a doppio.");
+
+        } else {
+          // Se rifiuta, marchiamo come 'rifiutato'
+          await supabaseClient.from('inviti_doppio').update({ stato: 'rifiutato' }).eq('id', idInvito);
+          alert("Richiesta rifiutata.");
+        }
+
+        await caricaInviti();
+      } catch (e) {
+        console.error("Errore nella risposta all'invito:", e);
+        alert("Errore di connessione.");
+      }
+    }
+  </script>
+</body>
+</html>
