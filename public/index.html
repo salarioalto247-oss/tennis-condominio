@@ -235,6 +235,11 @@
 
       if (savedUser && savedPin) {
         await validaEImpostaSessione(savedUser, savedPin);
+
+        if (typeof controllaInvitiDoppioPerUtente === 'function') {
+          controllaInvitiDoppioPerUtente(savedUser);
+        }
+
       } else {
         mostraModaleLogin();
       }
@@ -1040,7 +1045,7 @@
             await caricaTabellone();
           } else {
             const nuoviUtenti = utentiSlot.filter(u => u.toLowerCase() !== currentUser.cognome.toLowerCase());
-            prenotazioniGlobali[chiaveSlot] = nuoviUtenti;
+            prenotazioniGlobali[chiaveSlot] = novosUtenti = nuoviUtenti;
             await salvaPrenotazioneGoogle(chiaveSlot, nuoviUtenti, 'CANCELLAZIONE');
             await caricaTabellone();
           }
@@ -1070,18 +1075,28 @@
           return;
         }
 
-        const msg = utentiSlot.length === 1 
-          ? `C'è già ${utentiSlot[0]} in questo slot. Vuoi unirti per fare il doppio il giorno ${dataIso} alle ore ${ora}?`
-          : `Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`;
-
-        if (confirm(msg)) {
-          const tipoAzioneLog = utentiSlot.length === 1 ? 'UNIONE_DOPPIO' : 'NUOVA_PRENOTAZIONE';
-          utentiSlot.push(currentUser.cognome);
-          await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, tipoAzioneLog);
-          await caricaTabellone();
+        // Se c'è già 1 giocatore, invia la richiesta asincrona di doppio tramite Supabase
+        if (utentiSlot.length === 1) {
+          const proprietarioSlot = utentiSlot[0];
+          const msg = `C'è già ${proprietarioSlot} in questo slot. Vuoi inviargli una richiesta di invito per fare il doppio il giorno ${dataIso} alle ore ${ora}?`;
+          
+          if (confirm(msg)) {
+            await inviaRichiestaDoppio(chiaveSlot, currentUser.cognome, proprietarioSlot);
+          }
+        } else {
+          // Slot vuoto: prenotazione standard
+          const msg = `Confermi la prenotazione del campo per il giorno ${dataIso} alle ore ${ora}?`;
+          if (confirm(msg)) {
+            utentiSlot.push(currentUser.cognome);
+            await salvaPrenotazioneGoogle(chiaveSlot, utentiSlot, 'NUOVA_PRENOTAZIONE');
+            await caricaTabellone();
+          }
         }
       }
     }
   </script>
+
+<script src="inviti-doppio.js"></script>
+
 </body>
 </html>
