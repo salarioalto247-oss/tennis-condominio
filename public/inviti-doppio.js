@@ -1,5 +1,5 @@
 // ==========================================
-// GESTIONE INVITI DOPPIO (Client-Side con Realtime)
+// GESTIONE INVITI DOPPIO (Client-Side con Polling e Realtime)
 // ==========================================
 
 let supabaseRealtimeChannel = null;
@@ -34,7 +34,7 @@ async function inviaRichiestaDoppio(chiaveSlot, utenteY, utenteX) {
 }
 
 /**
- * 2. Inizializzazione dell'ascolto in tempo reale (Realtime) per l'utente loggato
+ * 2. Inizializzazione dell'ascolto (Realtime + Polling di sicurezza)
  */
 function avviaAscoltoInvitiRealtime(utenteCorrente) {
   if (!supabaseClient || !utenteCorrente) return;
@@ -44,7 +44,7 @@ function avviaAscoltoInvitiRealtime(utenteCorrente) {
     supabaseClient.removeChannel(supabaseRealtimeChannel);
   }
 
-  // Ascolta i cambiamenti sulla tabella inviti_doppio
+  // Ascolta i cambiamenti sulla tabella inviti_doppio via Realtime
   supabaseRealtimeChannel = supabaseClient
     .channel('public:inviti_doppio')
     .on(
@@ -55,7 +55,7 @@ function avviaAscoltoInvitiRealtime(utenteCorrente) {
         const vecchioInvito = payload.old;
 
         // CASO A: Arriva una nuova richiesta per me (sono il destinatario)
-        if (payload.eventType === 'INSERT' && nuovoInvito.destinatario === utenteCorrente && nuovoInvito.stato === 'in_attesa') {
+        if (payload.eventType === 'INSERT' && nuovoInvito.destinatario && utenteCorrente && nuovoInvito.destinatario.toLowerCase() === utenteCorrente.toLowerCase() && nuovoInvito.stato === 'in_attesa') {
           if (!isSlotScaduto(nuovoInvito.chiave_slot)) {
             mostraPopupInvito(nuovoInvito);
           }
@@ -77,7 +77,7 @@ function avviaAscoltoInvitiRealtime(utenteCorrente) {
     )
     .subscribe();
 
-  // Esegui anche un controllo iniziale all'avvio per eventuali inviti in sospeso
+  // Esegui anche un controllo iniziale all'avvio
   controllaInvitiInSospesoIniziali(utenteCorrente);
 }
 
@@ -89,7 +89,7 @@ async function controllaInvitiInSospesoIniziali(utenteX) {
     const { data: inviti, error } = await supabaseClient
       .from('inviti_doppio')
       .select('*')
-      .eq('destinatario', utenteX)
+      .ilike('destinatario', utenteX)
       .eq('stato', 'in_attesa');
 
     if (error) throw error;
@@ -188,6 +188,60 @@ function isSlotScaduto(chiaveSlot) {
     return false;
   }
 }
+
+// ==========================================
+// POLLING DI SICUREZZA (Ogni 5 secondi)
+// Controlla richieste in arrivo ed esiti senza bisogno di refresh
+// ==========================================
+setInterval(async () => {
+  const savedUser = localStorage.getItem('tennis_user');
+  if (!savedUser || typeof supabaseClient === 'undefined' || !supabaseClient) return;
+
+  try {
+    // 1. Controlla se ci sono nuove richieste per me (Destinatario)
+    const { data: invitiRicevuti, error: errRicevuti } = await supabaseClient
+      .from('inviti_doppio')
+      .select('*')
+      .ilike('destinatario', savedUser)
+      .eq('stato', 'in_attesa');
+
+    if (!errRicevuti && invitiRicevuti && invitiRicevuti.length > 0) {
+      invitiRicevuti.forEach(invito => {
+        if (!isSlotScaduto(invito.chiave_slot)) {
+          mostraPopupInvito(invito);
+        }
+      });
+    }
+
+    // 2. Controlla se le mie richieste inviate (Proponente) hanno avuto un esito (accettato/rifiutato) non ancora notificato
+    const { data: mieiInviti, error: errMiei } = await supabaseClient
+      .from('inviti_doppio')
+      .select('*')
+      .ilike('proponente', savedUser)
+      .in('stato', ['accettato', 'rifiutato']);
+
+    if (!errMiei && mieiInviti && mieiInviti.length > 0) {
+      mieiInviti.forEach(invito => {
+        const flagKey = `notificato_esito_${invito.id}_${invito.stato}`;
+        if (!sessionStorage.getItem(flagKey)) {
+          sessionStorage.setItem(flagKey, 'true');
+          const [dataIso, ora] = invito.chiave_slot.split('_');
+          
+          if (invito.stato === 'accettato') {
+            alert(`🎾 Ottime notizie! La tua richiesta di doppio per il giorno ${dataIso} alle ore ${ora} è stata ACCETTATA da ${invito.destinatario}!`);
+          } else if (invito.stato === 'rifiutato') {
+            alert(`❌ Spiacente, la tua richiesta di doppio per il giorno ${dataIso} alle ore ${ora} è stata RIFIUTATA da ${invito.destinatario}.`);
+          }
+          if (typeof caricaTabellone === 'function') {
+            caricaTabellone();
+          }
+        }
+      });
+    }
+  } catch (e) {
+    // Silenzioso per evitare log superflui in console
+  }
+}, 5000);
 
 // Avvia automaticamente l'ascolto appena l'utente effettua il login ed è disponibile Supabase
 window.addEventListener('DOMContentLoaded', () => {
