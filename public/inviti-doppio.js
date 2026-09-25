@@ -32,10 +32,10 @@ async function inviaRichiestaDoppio(chiaveSlot, utenteY, utenteX) {
 }
 
 /**
- * 2. Controllo all'apertura dell'app per l'utente loggato (X)
+ * 2. Controllo degli inviti in sospeso per l'utente loggato (X)
  */
 async function controllaInvitiDoppioPerUtente(utenteX) {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !utenteX) return;
   try {
     const { data: inviti, error } = await supabaseClient
       .from('inviti_doppio')
@@ -65,6 +65,7 @@ async function controllaInvitiDoppioPerUtente(utenteX) {
  * 3. Mostra una notifica a X con i pulsanti Accetta / Rifiuta
  */
 function mostraPopupInvito(invito) {
+  // Evita di duplicare lo stesso popup se è già visibile a schermo
   if (document.getElementById(`popup-invito-${invito.id}`)) return;
 
   const div = document.createElement('div');
@@ -101,6 +102,9 @@ async function rispondiInvitoDoppio(invitoId, azione, chiaveSlot, proponente, de
           prenotazioniGlobali[chiaveSlot].push(proponente);
           await salvaPrenotazioneGoogle(chiaveSlot, prenotazioniGlobali[chiaveSlot], 'UNIONE_DOPPIO');
         }
+      } else {
+        // Fallback se la variabile globale non è pronta
+        await salvaPrenotazioneGoogle(chiaveSlot, [destinatario, proponente], 'UNIONE_DOPPIO');
       }
       alert("Hai accettato l'invito! Il doppio è confermato.");
     } else {
@@ -125,7 +129,6 @@ async function rispondiInvitoDoppio(invitoId, azione, chiaveSlot, proponente, de
  */
 function isSlotScaduto(chiaveSlot) {
   try {
-    // La chiave è nel formato "YYYY-MM-DD_HH:00"
     const [dataIso, ora] = chiaveSlot.split('_');
     if (!dataIso || !ora) return false;
     const [hNum] = ora.split(':');
@@ -135,3 +138,14 @@ function isSlotScaduto(chiaveSlot) {
     return false;
   }
 }
+
+// ==========================================
+// POLLING AUTOMATICO IN BACKGROUND
+// ==========================================
+// Controlla automaticamente ogni 10 secondi se l'utente loggato ha ricevuto nuove richieste
+setInterval(() => {
+  const savedUser = localStorage.getItem('tennis_user');
+  if (savedUser && document.visibilityState === 'visible') {
+    controllaInvitiDoppioPerUtente(savedUser);
+  }
+}, 10000);
