@@ -1,6 +1,8 @@
 // ==========================================
-// GESTIONE INVITI DOPPIO (Client-Side)
+// GESTIONE INVITI DOPPIO (Client-Side con Realtime)
 // ==========================================
+
+let supabaseRealtimeChannel = null;
 
 /**
  * 1. Y richiede di unirsi allo slot occupato da X
@@ -20,7 +22,7 @@ async function inviaRichiestaDoppio(chiaveSlot, utenteY, utenteX) {
 
     if (error) throw error;
 
-    alert(`Richiesta inviata con successo a ${utenteX}! Ti avviseremo quando accetterà.`);
+    alert(`Richiesta inviata con successo a ${utenteX}! Ti avviseremo quando accetterà o rifiuterà.`);
     
     if (typeof caricaTabellone === 'function') {
       caricaTabellone();
@@ -32,10 +34,57 @@ async function inviaRichiestaDoppio(chiaveSlot, utenteY, utenteX) {
 }
 
 /**
- * 2. Controllo degli inviti in sospeso per l'utente loggato (X)
+ * 2. Inizializzazione dell'ascolto in tempo reale (Realtime) per l'utente loggato
  */
-async function controllaInvitiDoppioPerUtente(utenteX) {
-  if (!supabaseClient || !utenteX) return;
+function avviaAscoltoInvitiRealtime(utenteCorrente) {
+  if (!supabaseClient || !utenteCorrente) return;
+
+  // Chiudi eventuali canali precedenti per evitare duplicazioni
+  if (supabaseRealtimeChannel) {
+    supabaseClient.removeChannel(supabaseRealtimeChannel);
+  }
+
+  // Ascolta i cambiamenti sulla tabella inviti_doppio
+  supabaseRealtimeChannel = supabaseClient
+    .channel('public:inviti_doppio')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'inviti_doppio' },
+      (payload) => {
+        const nuovoInvito = payload.new;
+        const vecchioInvito = payload.old;
+
+        // CASO A: Arriva una nuova richiesta per me (sono il destinatario)
+        if (payload.eventType === 'INSERT' && nuovoInvito.destinatario === utenteCorrente && nuovoInvito.stato === 'in_attesa') {
+          if (!isSlotScaduto(nuovoInvito.chiave_slot)) {
+            mostraPopupInvito(nuovoInvito);
+          }
+        }
+
+        // CASO B: La mia richiesta inviata a qualcun altro è stata aggiornata (sono il proponente)
+        if (payload.eventType === 'UPDATE' && vecchioInvito && proponenteCoincide(vecchioInvito, utenteCorrente)) {
+          const [dataIso, ora] = nuovoInvito.chiave_slot.split('_');
+          
+          if (nuovoInvito.stato === 'accettato') {
+            alert(`🎾 Ottime notizie! La tua richiesta di doppio per il giorno ${dataIso} alle ore ${ora} è stata ACCETTATA da ${nuovoInvito.destinatario}!`);
+            if (typeof caricaTabellone === 'function') caricaTabellone();
+          } else if (nuovoInvito.stato === 'rifiutato') {
+            alert(`❌ Spiacente, la tua richiesta di doppio per il giorno ${dataIso} alle ore ${ora} è stata RIFIUTATA da ${nuovoInvito.destinatario}.`);
+            if (typeof caricaTabellone === 'function') caricaTabellone();
+          }
+        }
+      }
+    )
+    .subscribe();
+
+  // Esegui anche un controllo iniziale all'avvio per eventuali inviti in sospeso
+  controllaInvitiInSospesoIniziali(utenteCorrente);
+}
+
+/**
+ * Controlla inviti pendenti al login
+ */
+async function controllaInvitiInSospesoIniziali(utenteX) {
   try {
     const { data: inviti, error } = await supabaseClient
       .from('inviti_doppio')
@@ -57,15 +106,18 @@ async function controllaInvitiDoppioPerUtente(utenteX) {
       }
     }
   } catch (err) {
-    console.error("Errore nel controllo degli inviti doppio:", err);
+    console.error("Errore nel controllo iniziale degli inviti:", err);
   }
+}
+
+function proponenteCoincide(invito, utente) {
+  return invito.proponente && invito.proponente.toLowerCase() === utente.toLowerCase();
 }
 
 /**
  * 3. Mostra una notifica a X con i pulsanti Accetta / Rifiuta
  */
 function mostraPopupInvito(invito) {
-  // Evita di duplicare lo stesso popup se è già visibile a schermo
   if (document.getElementById(`popup-invito-${invito.id}`)) return;
 
   const div = document.createElement('div');
@@ -96,14 +148,12 @@ async function rispondiInvitoDoppio(invitoId, azione, chiaveSlot, proponente, de
     if (error) throw error;
 
     if (azione === 'accetta') {
-      // Aggiorna lo slot ufficiale su Google Calendar aggiungendo il proponente
       if (typeof prenotazioniGlobali !== 'undefined' && prenotazioniGlobali[chiaveSlot]) {
         if (!prenotazioniGlobali[chiaveSlot].includes(proponente)) {
           prenotazioniGlobali[chiaveSlot].push(proponente);
           await salvaPrenotazioneGoogle(chiaveSlot, prenotazioniGlobali[chiaveSlot], 'UNIONE_DOPPIO');
         }
       } else {
-        // Fallback se la variabile globale non è pronta
         await salvaPrenotazioneGoogle(chiaveSlot, [destinatario, proponente], 'UNIONE_DOPPIO');
       }
       alert("Hai accettato l'invito! Il doppio è confermato.");
@@ -139,13 +189,15 @@ function isSlotScaduto(chiaveSlot) {
   }
 }
 
-// ==========================================
-// POLLING AUTOMATICO IN BACKGROUND
-// ==========================================
-// Controlla automaticamente ogni 10 secondi se l'utente loggato ha ricevuto nuove richieste
-setInterval(() => {
-  const savedUser = localStorage.getItem('tennis_user');
-  if (savedUser && document.visibilityState === 'visible') {
-    controllaInvitiDoppioPerUtente(savedUser);
-  }
-}, 10000);
+// Avvia automaticamente l'ascolto appena l'utente effettua il login ed è disponibile Supabase
+window.addEventListener('DOMContentLoaded', () => {
+  const checkSupabaseReady = setInterval(() => {
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      clearInterval(checkSupabaseReady);
+      const savedUser = localStorage.getItem('tennis_user');
+      if (savedUser) {
+        avviaAscoltoInvitiRealtime(savedUser);
+      }
+    }
+  }, 500);
+});
