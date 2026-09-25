@@ -191,14 +191,13 @@ function isSlotScaduto(chiaveSlot) {
 
 // ==========================================
 // POLLING DI SICUREZZA (Ogni 5 secondi)
-// Controlla richieste in arrivo ed esiti senza bisogno di refresh
 // ==========================================
 setInterval(async () => {
   const savedUser = localStorage.getItem('tennis_user');
   if (!savedUser || typeof supabaseClient === 'undefined' || !supabaseClient) return;
 
   try {
-    // 1. Controlla se ci sono nuove richieste per me (Destinatario)
+    // 1. Controlla nuove richieste in arrivo (Destinatario)
     const { data: invitiRicevuti, error: errRicevuti } = await supabaseClient
       .from('inviti_doppio')
       .select('*')
@@ -213,12 +212,15 @@ setInterval(async () => {
       });
     }
 
-    // 2. Controlla se le mie richieste inviate (Proponente) hanno avuto un esito (accettato/rifiutato) non ancora notificato
+    // 2. Controlla lo stato delle richieste inviate (Proponente) negli ultimi 30 secondi
+    const trentaSecondiFa = new Date(Date.now() - 30000).toISOString();
+
     const { data: mieiInviti, error: errMiei } = await supabaseClient
       .from('inviti_doppio')
       .select('*')
       .ilike('proponente', savedUser)
-      .in('stato', ['accettato', 'rifiutato']);
+      .in('stato', ['accettato', 'rifiutato'])
+      .gte('updated_at', trentaSecondiFa);
 
     if (!errMiei && mieiInviti && mieiInviti.length > 0) {
       mieiInviti.forEach(invito => {
