@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Cruscotto Spazio Database - Tennis App</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; max-width: 500px; margin: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .progress-bar { background: #e0e0e0; border-radius: 4px; height: 20px; width: 100%; overflow: hidden; margin: 15px 0; }
+        .progress-fill { background: #4caf50; height: 100%; width: 0%; transition: width 0.4s ease; }
+        .progress-fill.warning { background: #ff9800; }
+        .progress-fill.danger { background: #f44336; }
+        button { background: #d32f2f; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 15px; }
+        button:hover { background: #b71c1c; }
+        .loading { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Gestione Spazio Database (Supabase)</h2>
+    <div id="stats-container">
+        <p class="loading">Caricamento statistiche in corso...</p>
+    </div>
+    
+    <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+    </div>
+    
+    <p id="target-info" style="font-size: 14px; color: #555;"></p>
+
+    <button id="clean-btn" onclick="eseguiSvecchiamento()" style="display:none;">Svecchia Database (Pulisci Storico)</button>
+    <p id="result-msg" style="margin-top: 10px; font-weight: bold;"></p>
+</div>
+
+<script>
+async function caricaStatistiche() {
+    try {
+        const response = await fetch('/api/storage-stats');
+        const data = await response.json();
+        
+        if(response.ok) {
+            const usedMB = data.usedMB || 0;
+            const limitMB = data.limitMB || 500;
+            const percentage = data.percentage || ((usedMB / limitMB) * 100).toFixed(1);
+            
+            document.getElementById('stats-container').innerHTML = `
+                <p>Spazio occupato: <strong>${usedMB} MB</strong> / ${limitMB} MB (${percentage}%)</p>
+            `;
+            
+            const fill = document.getElementById('progress-fill');
+            fill.style.width = Math.min(percentage, 100) + '%';
+            
+            if(percentage > 70) {
+                fill.className = 'progress-fill danger';
+            } else if(percentage > 40) {
+                fill.className = 'progress-fill warning';
+            } else {
+                fill.className = 'progress-fill';
+            }
+
+            document.getElementById('target-info').innerText = `Obiettivo manutenzione: Mantenere sotto il 40% (200 MB).`;
+            document.getElementById('clean-btn').style.display = 'block';
+        } else {
+            document.getElementById('stats-container').innerHTML = `<p style="color:red;">Errore nel recupero dati.</p>`;
+        }
+    } catch (e) {
+        document.getElementById('stats-container').innerHTML = `<p style="color:red;">Impossibile connettersi al server.</p>`;
+    }
+}
+
+async function eseguiSvecchiamento() {
+    if(!confirm("Sei sicuro di voler eliminare i dati storici (prenotazioni concluse/annullate da oltre 6 mesi) per liberare spazio?")) return;
+    
+    const msg = document.getElementById('result-msg');
+    msg.style.color = '#333';
+    msg.innerText = "Pulizia in corso...";
+    
+    try {
+        const response = await fetch('/api/storage-stats', { method: 'POST' });
+        const data = await response.json();
+        
+        if(response.ok) {
+            msg.style.color = 'green';
+            msg.innerText = data.message;
+            caricaStatistiche(); // Ricarica i dati aggiornati
+        } else {
+            msg.style.color = 'red';
+            msg.innerText = "Errore: " + data.error;
+        }
+    } catch (e) {
+        msg.style.color = 'red';
+        msg.innerText = "Errore di connessione durante la pulizia.";
+    }
+}
+
+// Carica all'avvio
+caricaStatistiche();
+</script>
+
+</body>
+</html>
