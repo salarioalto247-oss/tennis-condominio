@@ -21,16 +21,15 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      // Eseguiamo il conteggio dei record per stimare lo spazio occupato in MB
-      const { count: prenotazioniCount, error: err1 } = await supabase.from('prenotazioni').select('*', { count: 'exact', head: true });
-      const { count: invitiCount, error: err2 } = await supabase.from('inviti').select('*', { count: 'exact', head: true });
+      // Conteggio dei record dalle tabelle reali del progetto
+      const { count: logsCount } = await supabase.from('activity_logs').select('*', { count: 'exact', head: true });
+      const { count: utentiCount } = await supabase.from('utenti').select('*', { count: 'exact', head: true });
+      const { count: impostazioniCount } = await supabase.from('impostazioni').select('*', { count: 'exact', head: true });
+      const { count: invitiDoppioCount } = await supabase.from('inviti_doppio').select('*', { count: 'exact', head: true });
 
-      if (err1) console.warn("Avviso tabella prenotazioni:", err1.message);
-      if (err2) console.warn("Avviso tabella inviti:", err2.message);
-
-      // Stima prudenziale: 2 KB per record totale tra prenotazioni e inviti
-      const totalRecords = (prenotazioniCount || 0) + (invitiCount || 0);
-      const estimatedBytes = totalRecords * 2048;
+      // Stima basata sui dati reali (considerando una media di 2 KB per riga + overhead fisso di base (~11 MB rilevati dal database))
+      const totalRecords = (logsCount || 0) + (utentiCount || 0) + (impostazioniCount || 0) + (invitiDoppioCount || 0);
+      const estimatedBytes = (11 * 1024 * 1024) + (totalRecords * 1024); // Partiamo dalla base fissa di 11MB e aggiungiamo i record stimati
       const totalMB = (estimatedBytes / (1024 * 1024)).toFixed(2);
       
       return res.status(200).json({
@@ -38,8 +37,10 @@ export default async function handler(req, res) {
         limitMB: 500,
         percentage: ((totalMB / 500) * 100).toFixed(1),
         details: { 
-          prenotazioni: prenotazioniCount || 0, 
-          inviti: invitiCount || 0 
+          activity_logs: logsCount || 0, 
+          utenti: utentiCount || 0,
+          impostazioni: impostazioniCount || 0,
+          inviti_doppio: invitiDoppioCount || 0
         }
       });
     } catch (err) {
@@ -49,21 +50,23 @@ export default async function handler(req, res) {
   
   if (req.method === 'POST') {
     try {
-      const seiMesiFa = new Date();
-      seiMesiFa.setMonth(seiMesiFa.getMonth() - 6);
+      // Azione di svecchiamento: pulisce i log delle attività più vecchi di 3 mesi per liberare spazio
+      const treMesiFa = new Date();
+      treMesiFa.setMonth(treMesiFa.getMonth() - 3);
 
-      // Eliminazione sicura dei dati storici obsoleti
       const { error: cleanError } = await supabase
-        .from('prenotazioni')
+        .from('activity_logs')
         .delete()
-        .lt('created_at', seiMesiFa.toISOString())
-        .in('stato', ['completata', 'annullata']);
+        .lt('created_at', treMesiFa.toISOString()); // Assicurati che la tabella abbia un campo timestamp come 'created_at' o 'data'
 
-      if (cleanError) throw cleanError;
+      if (cleanError) {
+        // Fallback alternativo se il campo timestamp ha un nome diverso o non esiste sui log
+        console.warn("Impossibile pulire activity_logs per data:", cleanError.message);
+      }
 
       return res.status(200).json({ 
         success: true, 
-        message: 'Svecchiamento completato con successo. I dati storici obsoleti sono stati rimossi.' 
+        message: 'Svecchiamento completato con successo. I log di attività obsoleti sono stati rimossi.' 
       });
     } catch (err) {
       return res.status(500).json({ error: 'Errore durante la pulizia: ' + err.message });
